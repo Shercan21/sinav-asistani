@@ -5,3 +5,5 @@ export async function listPapers(){const db=await database();try{return await ne
 export const savePaper=(id,file)=>savePapers([[id,file]]);
 export const toBase64=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)});
 export function fromBase64(p){const binary=atob(p.base64);return new File([Uint8Array.from(binary,c=>c.charCodeAt(0))],p.name,{type:p.type,lastModified:p.lastModified||0})}
+
+export async function deletePapers(ids){const db=await database();try{await new Promise((resolve,reject)=>{const tx=db.transaction("papers","readwrite");for(const id of ids)tx.objectStore("papers").delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}finally{db.close()}}
