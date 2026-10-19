@@ -50,6 +50,11 @@ const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==
 const same=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
 export function mergeBackup(current,incoming){
   validateBackup(current);validateBackup(incoming);
+  const initialClasses=[{id:'demo-1',name:'9-A',count:28},{id:'demo-2',name:'10-B',count:26}];
+  const initialExams=[{id:'demo-1',name:'1. Dönem 1. Yazılı',className:'9-A',subject:'Kimya',questions:8,type:'Karma'}];
+  // Only untouched startup examples may yield to a real backup. Any edit keeps
+  // the existing conflict protection, including added keys, names or results.
+  if(current.papers.length===0&&same(current.classes,initialClasses)&&same(current.exams,initialExams))current={...current,classes:[],exams:[]};
   const merge=(oldRows,newRows,label)=>{
     const result=[...oldRows];
     for(const item of newRows){const previous=oldRows.find(row=>row.id===item.id);if(previous&&!same(previous,item))throw new Error(`${label} mevcut kayıttan farklı. Güvenlik için hiçbir kayıt değiştirilmedi. Yedeği boş bir tarayıcıda açabilirsiniz.`);if(!previous)result.push(item)}
