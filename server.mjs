@@ -29,13 +29,14 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         const payload=`${now()+900000}.${randomBytes(16).toString('hex')}`,token=`${payload}.${sign(payload)}`;
         if(loginTokens.size>=1000)loginTokens.clear();loginTokens.add(token);
         res.setHeader('Set-Cookie',csrfCookie(token));
-        return send(200,LOGIN.replace('<form method="post" action="/login">',`<form method="post" action="/login"><input type="hidden" name="csrf" value="${token}">`),'text/html; charset=utf-8');
+        const script=`<script>document.querySelector('form').addEventListener('submit',async function(event){event.preventDefault();const button=this.querySelector('button');button.disabled=true;let notice=document.querySelector('[role="alert"]');if(!notice){notice=document.createElement('p');notice.setAttribute('role','alert');this.after(notice)}notice.textContent='Giriş yapılıyor…';try{const response=await fetch('/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Login-Request':'1'},body:new URLSearchParams(new FormData(this))});if(response.ok){location.replace('/');return}notice.textContent=await response.text();if(response.status===403){notice.textContent='Giriş doğrulaması yenilenmeli. Sayfayı bir kez yenileyin.'}}catch{notice.textContent='Bağlantı kesildi. Tekrar deneyin.'}finally{button.disabled=false}});</script>`;
+        return send(200,LOGIN.replace('<form method="post" action="/login">',`<form method="post" action="/login"><input type="hidden" name="csrf" value="${token}">`)+script,'text/html; charset=utf-8');
       }
       if(path==='/login'&&req.method==='POST'){
         if(!req.headers['content-type']?.startsWith('application/x-www-form-urlencoded'))return send(403,{error:'Giriş isteği doğrulanamadı.'});
         const form=new URLSearchParams(await body(2048)),token=form.get('csrf')||'',savedToken=req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('sa_login='))?.slice(9)||'';
         const [expires,nonce,signature]=token.split('.');
-        if(!loginTokens.delete(token)||!equal(token,savedToken)||Number(expires)<=now()||Number(expires)>now()+900000||nonce?.length!==32||signature?.length!==64||!equal(signature,sign(`${expires}.${nonce}`)))return send(403,'Giriş sayfasının süresi doldu. Geri dönüp sayfayı yenileyin.','text/plain; charset=utf-8');
+        if(!loginTokens.delete(token)||!equal(token,savedToken)||Number(expires)<=now()||Number(expires)>now()+900000||nonce?.length!==32||signature?.length!==64||!equal(signature,sign(`${expires}.${nonce}`))){console.info('Login verification failed',JSON.stringify({formToken:Boolean(token),cookieToken:Boolean(savedToken),matched:equal(token,savedToken)}));return send(403,'Giriş sayfasının süresi doldu. Geri dönüp sayfayı yenileyin.','text/plain; charset=utf-8')}
         if(now()-loginWindow>=900000){loginAttempts=0;loginWindow=now()}
         if(loginAttempts>=10)return send(429,'Çok fazla giriş denemesi. 15 dakika sonra yeniden deneyin.','text/plain; charset=utf-8');
         loginAttempts++;
@@ -43,7 +44,9 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         if(!equal(candidate,password))return send(401,'Şifre yanlış. Geri dönüp tekrar deneyin.','text/plain; charset=utf-8');
         loginAttempts=0;
         const sessionToken=`${now()+43200000}.${randomBytes(16).toString('hex')}`;
-        res.writeHead(303,{'Set-Cookie':cookie(`${sessionToken}.${sign(sessionToken)}`),Location:'/'});return res.end();
+        res.setHeader('Set-Cookie',cookie(`${sessionToken}.${sign(sessionToken)}`));
+        if(req.headers['x-login-request']==='1')return send(200,{ok:true});
+        res.writeHead(303,{Location:'/'});return res.end();
       }
       if(!validSession(req)){
         if(path.startsWith('/api/'))return send(401,{error:'Oturum kapandı. Sayfayı yenileyip giriş yapın.'});
