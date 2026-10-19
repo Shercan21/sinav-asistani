@@ -13,6 +13,8 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
   if(typeof password!=='string'||password.length<12||password.length>256)throw new Error('APP_PASSWORD en az 12, en fazla 256 karakter olmalı.');
   const allowed=new URL(origin).origin;
   const sign=text=>createHmac('sha256',secret).update(text).digest('hex');
+  const csrfCookie=token=>`sa_login=${token}; HttpOnly; SameSite=Strict; Path=/login; Max-Age=900${secure?'; Secure':''}`;
+  const loginTokens=new Set();
   const cookie=token=>`sa_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200${secure?'; Secure':''}`;
   const validSession=req=>{const token=req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('sa_session='))?.slice(11)||'';const [expires,nonce,signature]=token.split('.');return token.length<256&&Number(expires)>now()&&Number(expires)<=now()+43200000&&nonce?.length===32&&signature?.length===64&&equal(signature,sign(`${expires}.${nonce}`))};
   let loginAttempts=0,loginWindow=now(),active=false,lastRead=-Infinity,reads=0,readWindow=now();
@@ -23,17 +25,25 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
     try{
       const path=new URL(req.url,'http://server').pathname;
       if(path==='/healthz'&&req.method==='GET')return send(200,{ok:true});
-      if(path==='/login'&&req.method==='GET')return send(200,LOGIN,'text/html; charset=utf-8');
+      if(path==='/login'&&req.method==='GET'){
+        const payload=`${now()+900000}.${randomBytes(16).toString('hex')}`,token=`${payload}.${sign(payload)}`;
+        if(loginTokens.size>=1000)loginTokens.clear();loginTokens.add(token);
+        res.setHeader('Set-Cookie',csrfCookie(token));
+        return send(200,LOGIN.replace('<form method="post" action="/login">',`<form method="post" action="/login"><input type="hidden" name="csrf" value="${token}">`),'text/html; charset=utf-8');
+      }
       if(path==='/login'&&req.method==='POST'){
-        if(req.headers.origin!==allowed||!req.headers['content-type']?.startsWith('application/x-www-form-urlencoded'))return send(403,{error:'Giriş isteği doğrulanamadı.'});
+        if(!req.headers['content-type']?.startsWith('application/x-www-form-urlencoded'))return send(403,{error:'Giriş isteği doğrulanamadı.'});
+        const form=new URLSearchParams(await body(2048)),token=form.get('csrf')||'',savedToken=req.headers.cookie?.split(';').map(s=>s.trim()).find(s=>s.startsWith('sa_login='))?.slice(9)||'';
+        const [expires,nonce,signature]=token.split('.');
+        if(!loginTokens.delete(token)||!equal(token,savedToken)||Number(expires)<=now()||Number(expires)>now()+900000||nonce?.length!==32||signature?.length!==64||!equal(signature,sign(`${expires}.${nonce}`)))return send(403,'Giriş sayfasının süresi doldu. Geri dönüp sayfayı yenileyin.','text/plain; charset=utf-8');
         if(now()-loginWindow>=900000){loginAttempts=0;loginWindow=now()}
         if(loginAttempts>=10)return send(429,'Çok fazla giriş denemesi. 15 dakika sonra yeniden deneyin.','text/plain; charset=utf-8');
         loginAttempts++;
-        const candidate=new URLSearchParams(await body(2048)).get('password')||'';
+        const candidate=form.get('password')||'';
         if(!equal(candidate,password))return send(401,'Şifre yanlış. Geri dönüp tekrar deneyin.','text/plain; charset=utf-8');
         loginAttempts=0;
-        const token=`${now()+43200000}.${randomBytes(16).toString('hex')}`;
-        res.writeHead(303,{'Set-Cookie':cookie(`${token}.${sign(token)}`),Location:'/'});return res.end();
+        const sessionToken=`${now()+43200000}.${randomBytes(16).toString('hex')}`;
+        res.writeHead(303,{'Set-Cookie':cookie(`${sessionToken}.${sign(sessionToken)}`),Location:'/'});return res.end();
       }
       if(!validSession(req)){
         if(path.startsWith('/api/'))return send(401,{error:'Oturum kapandı. Sayfayı yenileyip giriş yapın.'});
