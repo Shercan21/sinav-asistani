@@ -1,24 +1,42 @@
 export function emptyReading(count){return {fullText:'',answers:Array.from({length:count},(_,i)=>({question:i+1,text:'',choice:'?',unclear:true}))}}
 export function detectQuestionAreas(pages,count,layout='auto'){
-  const areas=Array.from({length:count},()=>[]),seen=new Set();let previous=null;
+  const areas=Array.from({length:count},()=>[]),columns=[],candidates=[];let previous=null;
   for(const page of pages){
     const anchors=page.lines.map(line=>{const match=line.text.match(/^\s*(\d{1,3})\s*[).]\s*/);return match?{question:Number(match[1]),x:line.x,y:line.y}:null}).filter(a=>a&&a.question>=1&&a.question<=count&&a.y>.045);
     const split=layout==='two'||(layout==='auto'&&anchors.some(a=>a.x>.42)&&anchors.some(a=>a.x<.35));
     for(const col of (split?[0,1]:[0])){
       const left=split?(col===0?0:.49):0,right=split?(col===0?.51:1):1;
       const list=anchors.filter(a=>!split||(col===0?a.x<.42:a.x>=.42)).sort((a,b)=>a.y-b.y);
-      const unique=list.filter(a=>{if(seen.has(a.question))return false;seen.add(a.question);return true});
+      const group={page:page.page,left,right,anchors:[]};columns.push(group);
+      for(const anchor of list){const item={...anchor,group,margin:Math.abs(anchor.x-left)};group.anchors.push(item);candidates.push(item)}
+    }
+  }
+  // Formula lines can look like "3)". Select the longest increasing question
+  // sequence across columns/pages before cutting; prefer column-margin labels
+  // when duplicate candidates provide equally complete sequences.
+  const paths=[];
+  candidates.forEach((candidate,i)=>{
+    let path={items:[candidate],penalty:candidate.margin};
+    for(let j=0;j<i;j++)if(candidates[j].question<candidate.question){
+      const next={items:[...paths[j].items,candidate],penalty:paths[j].penalty+candidate.margin};
+      if(next.items.length>path.items.length||(next.items.length===path.items.length&&next.penalty<path.penalty))path=next;
+    }
+    paths.push(path);
+  });
+  const best=paths.reduce((best,path)=>path.items.length>best.items.length||(path.items.length===best.items.length&&path.penalty<best.penalty)?path:best,{items:[],penalty:Infinity});
+  const selected=new Set(best.items);
+  for(const group of columns){
+      const {left,right}=group,unique=group.anchors.filter(a=>selected.has(a));
       if(previous&&unique.length&&unique[0].y>.22){
         // A continuation at the top of a new column/page belongs to the last
         // question in reading order. Teacher reviews every inferred region.
-        areas[previous-1].push({page:page.page,x:left,y:.10,width:right-left,height:Math.max(.02,unique[0].y-.115),inferred:true});
+        areas[previous-1].push({page:group.page,x:left,y:.10,width:right-left,height:Math.max(.02,unique[0].y-.115),inferred:true});
       }
       unique.forEach((a,i)=>{
         const y=Math.max(0,a.y-.012),bottom=i+1<unique.length?unique[i+1].y-.012:.97;
-        if(bottom>y+.02)areas[a.question-1].push({page:page.page,x:left,y,width:right-left,height:bottom-y,inferred:true});
+        if(bottom>y+.02)areas[a.question-1].push({page:group.page,x:left,y,width:right-left,height:bottom-y,inferred:true});
         previous=a.question;
       });
-    }
   }
   return areas;
 }
