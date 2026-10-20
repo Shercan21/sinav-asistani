@@ -5,12 +5,13 @@ import {readFile,stat} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readWithGemini} from './ocr-server.mjs';
+import {proposeWithGemini} from './grading-server.mjs';
 
 const LOGIN=`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sınav Asistanı · Giriş</title><style>body{font:18px system-ui;background:#f3f5f9;color:#17233c;margin:0;display:grid;min-height:100vh;place-items:center}main{background:white;padding:30px;border-radius:16px;width:min(360px,80vw)}input,button{box-sizing:border-box;width:100%;padding:14px;margin-top:14px;font:inherit}button{background:#245ad1;color:white;border:0;border-radius:8px}p{line-height:1.5}</style><main><h1>Sınav Asistanı</h1><p>Otomatik okuma sunucusunu kullanmak için belirlediğiniz giriş şifresini yazın.</p><form method="post" action="/login"><label>Giriş şifresi<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label><button>Giriş yap</button></form></main></html>`;
 const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const digest=value=>createHash('sha256').update(value).digest();
 const equal=(a,b)=>timingSafeEqual(digest(a),digest(b));
-export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=true,reader=readWithGemini,now=Date.now,secret=randomBytes(32),personalAuth=false}={}) {
+export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=true,reader=readWithGemini,grader=proposeWithGemini,now=Date.now,secret=randomBytes(32),personalAuth=false}={}) {
   if(!personalAuth&&(typeof password!=='string'||password.length<12||password.length>256))throw new Error('APP_PASSWORD en az 12, en fazla 256 karakter olmalı.');
   const allowed=new URL(origin).origin;
   const authClient=personalAuth?createClient('https://veoxuyxrvoytqwhtnfyh.supabase.co','sb_publishable_6zPYtmYT6E_vcarIV7gAnQ_3c3gx75y',{auth:{persistSession:false,autoRefreshToken:false}}):null;
@@ -62,7 +63,7 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         if(error||!data.user)return send(401,{error:'Kişisel oturumunuz sona erdi. Yeniden giriş yapın.'});
       }
       if(path==='/api/ocr/status'&&req.method==='GET')return send(200,{configured:Boolean(apiKey),provider:'Google Gemini',model:'gemini-2.5-flash'});
-      if(path==='/api/ocr'&&req.method==='POST'){
+      if(['/api/ocr','/api/ocr/grade'].includes(path)&&req.method==='POST'){
         if(req.headers.origin!==allowed||!req.headers['content-type']?.startsWith('application/json'))return send(403,{error:'İstek doğrulanamadı.'});
         if(!apiKey)return send(503,{error:'Sunucuda Gemini bağlantısı ayarlanmadı.'});
         if(now()-readWindow>=3600000){reads=0;readWindow=now()}
@@ -72,7 +73,7 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         try{
           const input=JSON.parse(await body(15*1024*1024));
           if(input.consent!==true)return send(400,{error:'Google Gemini’ye gönderim onayı gerekli.'});
-          const result=await reader(input,{apiKey,signal:abort.signal});return send(200,result);
+          const result=await (path==='/api/ocr/grade'?grader:reader)(input,{apiKey,signal:abort.signal});return send(200,result);
         }catch(err){return send(400,{error:err.message==='BODY_LIMIT'?'Dosya çok büyük. En fazla 10 MB seçin.':err instanceof SyntaxError?'Dosya isteği okunamadı.':['AbortError','TimeoutError'].includes(err.name)?'Okuma iptal edildi veya zaman aşımına uğradı.':err.message?.startsWith('fetch')?'Okuma servisine ulaşılamadı.':err.message||'Okuma tamamlanamadı.'})}finally{res.removeListener('close',closed);active=false}
       }
       if(path.startsWith('/api/'))return send(405,{error:'Desteklenmeyen işlem.'});

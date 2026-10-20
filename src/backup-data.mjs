@@ -30,6 +30,12 @@ export function validateBackup(data) {
       for(const [studentId,saved] of Object.entries(exam.readings)){
         if(!(classroom.students||[]).some(s=>s.id===studentId)||!saved||!/^[a-f0-9]{64}$/.test(saved.paperFingerprint)||typeof saved.reviewed!=='boolean')fail();
         normalizeReading(saved.reading,exam.questions);
+        if(saved.proposal!==undefined){
+          const proposal=saved.proposal;
+          if(!proposal||!/^[a-f0-9]{64}$/.test(proposal.context)||!Array.isArray(proposal.answers)||proposal.answers.length!==exam.questions)fail();
+          const seen=new Set();
+          for(const row of proposal.answers){if(!row||!Number.isInteger(row.question)||row.question<1||row.question>exam.questions||seen.has(row.question)||typeof row.reason!=='string'||row.reason.length>3000||typeof row.unclear!=='boolean'||(row.score!==null&&(typeof row.score!=='number'||!Number.isFinite(row.score)||row.score<0||row.score>100)))fail();seen.add(row.question)}
+        }
       }
     }
     if(exam.results!==undefined){

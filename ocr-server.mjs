@@ -1,3 +1,4 @@
+import {proposeWithGemini} from './grading-server.mjs';
 import {readFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
@@ -43,11 +44,11 @@ export function isLocalRequest(req){
 export function ocrPlugin(){
   let active=false,lastRequest=0;
   return {name:'sinav-local-ocr',configureServer(server){server.middlewares.use(async(req,res,next)=>{
-    const path=req.url?.split('?')[0];if(!['/api/ocr','/api/ocr/status'].includes(path))return next();
+    const path=req.url?.split('?')[0];if(!['/api/ocr','/api/ocr/status','/api/ocr/grade'].includes(path))return next();
     const send=(code,body)=>{if(res.destroyed||res.writableEnded)return;res.statusCode=code;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(body))};
     if(!isLocalRequest(req))return send(403,{error:'Okuma yalnızca bu bilgisayardan kullanılabilir.'});
     if(path==='/api/ocr/status'&&req.method==='GET')return send(200,{configured:Boolean(await getApiKey()),provider:'Google Gemini',model:'gemini-2.5-flash'});
-    if(path!=='/api/ocr'||req.method!=='POST')return send(405,{error:'Desteklenmeyen işlem.'});
+    if(!['/api/ocr','/api/ocr/grade'].includes(path)||req.method!=='POST')return send(405,{error:'Desteklenmeyen işlem.'});
     if(!req.headers.origin||!req.headers['content-type']?.startsWith('application/json'))return send(403,{error:'İstek doğrulanamadı.'});
     if(active||Date.now()-lastRequest<5000)return send(429,{error:'Devam eden okuma tamamlandıktan sonra tekrar deneyin.'});
     active=true;lastRequest=Date.now();
@@ -56,7 +57,7 @@ export function ocrPlugin(){
       for await(const chunk of req){size+=chunk.length;if(size>15*1024*1024){send(413,{error:'Otomatik okuma sınırı 10 MB.'});req.resume();return}chunks.push(chunk)}
       let input;try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{return send(400,{error:'Dosya isteği okunamadı.'})}
       if(input.consent!==true)return send(400,{error:'Google Gemini’ye gönderim onayı gerekli.'});
-      const abort=new AbortController();const onClose=()=>abort.abort();res.once('close',onClose);try{const result=await readWithGemini(input,{apiKey:await getApiKey(),signal:abort.signal});send(200,result)}finally{res.removeListener('close',onClose)}
+      const abort=new AbortController();const onClose=()=>abort.abort();res.once('close',onClose);try{const result=await (path==='/api/ocr/grade'?proposeWithGemini:readWithGemini)(input,{apiKey:await getApiKey(),signal:abort.signal});send(200,result)}finally{res.removeListener('close',onClose)}
     }catch(err){const message=['TimeoutError','AbortError'].includes(err.name)?'Okuma zaman aşımına uğradı. Tekrar deneyin.':err.message;send(400,{error:message.startsWith('fetch')?'İnternet bağlantısını kontrol edin.':message})}finally{active=false}
   })}}
 }
