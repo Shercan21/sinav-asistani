@@ -49,7 +49,7 @@ export function validateBackup(data) {
   for(const p of data.papers){
     const [examId,studentId,...rest]=typeof p.id==='string'?p.id.split(':'):[];
     const exam=data.exams.find(e=>e.id===examId), classroom=data.classes.find(c=>c.name===exam?.className);
-    if(rest.length||!exam||!(classroom.students||[]).some(s=>s.id===studentId)||paperIds.has(p.id)||!textOK(p.name)||!['image/jpeg','image/png','image/webp','application/pdf'].includes(p.type)||typeof p.base64!=='string'||p.base64.length>20971520||p.base64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(p.base64))fail();
+    if(rest.length||!exam||(studentId!=='__answer_key__'&&!(classroom.students||[]).some(s=>s.id===studentId))||paperIds.has(p.id)||!textOK(p.name)||!['image/jpeg','image/png','image/webp','application/pdf'].includes(p.type)||typeof p.base64!=='string'||p.base64.length>20971520||p.base64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(p.base64))fail();
     paperIds.add(p.id);
   }
   return data;

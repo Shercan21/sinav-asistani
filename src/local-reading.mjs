@@ -37,7 +37,7 @@ export async function cropQuestion(paper,areas){
   try{
     for(const area of areas){const page=await source.render(area.page);try{const c=document.createElement('canvas');c.width=Math.max(1,Math.round(page.width*area.width));c.height=Math.max(1,Math.round(page.height*area.height));c.getContext('2d').drawImage(page,Math.round(page.width*area.x),Math.round(page.height*area.y),c.width,c.height,0,0,c.width,c.height);pieces.push(c)}finally{page.width=0;page.height=0}}
     const width=Math.max(...pieces.map(c=>c.width)),height=pieces.reduce((n,c)=>n+c.height,0)+24*(pieces.length-1);
-    const scale=Math.min(1,2800/height,1800/width),out=document.createElement('canvas');out.width=Math.max(1,Math.round(width*scale));out.height=Math.max(1,Math.round(height*scale));
+    const scale=Math.min(2,2800/height,1800/width),out=document.createElement('canvas');out.width=Math.max(1,Math.round(width*scale));out.height=Math.max(1,Math.round(height*scale));
     const ctx=out.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,out.width,out.height);let y=0;
     for(const piece of pieces){ctx.drawImage(piece,0,Math.round(y*scale),Math.round(piece.width*scale),Math.round(piece.height*scale));y+=piece.height+24}
     return out.toDataURL('image/jpeg',.94);

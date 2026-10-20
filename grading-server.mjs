@@ -1,5 +1,7 @@
+import {compareImagesWithGemini} from './image-grading-server.mjs';
 import {validateGradeInput,normalizeProposal} from './src/grade-proposal.mjs';
 export async function proposeWithGemini(raw,{apiKey,fetcher=fetch,signal}={}){
+  if(raw?.comparison==='images')return compareImagesWithGemini(raw,{apiKey,fetcher,signal});
   const input=validateGradeInput(raw);
   if(!apiKey)throw new Error('Gemini bağlantısı bulunamadı.');
   const response=await fetcher('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{
