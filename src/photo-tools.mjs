@@ -27,3 +27,13 @@ export async function pagesToPdf(pages,compact=true){
   if(file.size>15*1024*1024)throw new Error('PDF 15 MB sınırını aşıyor. Daha az sayfa veya küçük dosya seçeneğiyle hazırlayın.');
   return file;
 }
+
+export function brightenCanvas(canvas){
+  const ctx=canvas.getContext('2d'),image=ctx.getImageData(0,0,canvas.width,canvas.height);
+  for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]=Math.min(255,Math.round(image.data[i+c]*1.18));
+  ctx.putImageData(image,0,0);return canvas;
+}
+export async function brightenPhoto(page){
+  const image=await imageFromUrl(page.data),canvas=document.createElement('canvas');canvas.width=page.width;canvas.height=page.height;canvas.getContext('2d').drawImage(image,0,0);brightenCanvas(canvas);
+  return {...page,data:canvas.toDataURL('image/jpeg',.94)};
+}
