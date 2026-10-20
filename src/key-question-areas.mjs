@@ -17,6 +17,7 @@ export function keyQuestionAreas(pages,count){
   const match=text.match(/^\s*(\d+)\s*[.)]?\s*SORU\s*PUAN\s*DUZELT/i);
   if(!match)continue;const n=Number(match[1]);if(n<1||n>count)continue;
   const x=line.x>=.42?.49:0,y=Math.max(0,line.y-.015);
+  areas.forEach((rows,i)=>{if(i===n-1)return;for(const a of rows)if(a.page===page.page&&a.x<=line.x&&a.x+a.width>line.x&&a.y<y-.02&&a.y+a.height>y)a.height=y-a.y});
   if(y<.95&&!areas[n-1].some(a=>a.page===page.page&&a.x<=line.x&&a.x+a.width>line.x&&a.y<=line.y&&a.y+a.height>line.y))areas[n-1].push({page:page.page,x,y,width:.51,height:Math.min(.20,.97-y),inferred:true});
  }
  return areas;
