@@ -1,3 +1,4 @@
+import {createClient} from '@supabase/supabase-js';
 import {createServer} from 'node:http';
 import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {readFile,stat} from 'node:fs/promises';
@@ -9,9 +10,10 @@ const LOGIN=`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="vi
 const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const digest=value=>createHash('sha256').update(value).digest();
 const equal=(a,b)=>timingSafeEqual(digest(a),digest(b));
-export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=true,reader=readWithGemini,now=Date.now,secret=randomBytes(32)}={}) {
-  if(typeof password!=='string'||password.length<12||password.length>256)throw new Error('APP_PASSWORD en az 12, en fazla 256 karakter olmalı.');
+export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=true,reader=readWithGemini,now=Date.now,secret=randomBytes(32),personalAuth=false}={}) {
+  if(!personalAuth&&(typeof password!=='string'||password.length<12||password.length>256))throw new Error('APP_PASSWORD en az 12, en fazla 256 karakter olmalı.');
   const allowed=new URL(origin).origin;
+  const authClient=personalAuth?createClient('https://veoxuyxrvoytqwhtnfyh.supabase.co','sb_publishable_6zPYtmYT6E_vcarIV7gAnQ_3c3gx75y',{auth:{persistSession:false,autoRefreshToken:false}}):null;
   const sign=text=>createHmac('sha256',secret).update(text).digest('hex');
   const csrfCookie=token=>`sa_login=${token}; HttpOnly; SameSite=Strict; Path=/login; Max-Age=900${secure?'; Secure':''}`;
   const loginTokens=new Set();
@@ -25,6 +27,7 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
     try{
       const path=new URL(req.url,'http://server').pathname;
       if(path==='/healthz'&&req.method==='GET')return send(200,{ok:true});
+      if(personalAuth&&path==='/login'){res.writeHead(303,{Location:'/'});return res.end();}
       if(path==='/login'&&req.method==='GET'){
         const payload=`${now()+900000}.${randomBytes(16).toString('hex')}`,token=`${payload}.${sign(payload)}`;
         if(loginTokens.size>=1000)loginTokens.clear();loginTokens.add(token);
@@ -48,9 +51,15 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         if(req.headers['x-login-request']==='1')return send(200,{ok:true});
         res.writeHead(303,{Location:'/'});return res.end();
       }
-      if(!validSession(req)){
+      if(!personalAuth&&!validSession(req)){
         if(path.startsWith('/api/'))return send(401,{error:'Oturum kapandı. Sayfayı yenileyip giriş yapın.'});
         res.writeHead(303,{Location:'/login'});return res.end();
+      }
+      if(authClient&&path.startsWith('/api/ocr')){
+        const token=req.headers.authorization?.match(/^Bearer (.{1,8192})$/)?.[1];
+        if(!token)return send(401,{error:'Kişisel hesabınıza giriş yapın.'});
+        const {data,error}=await authClient.auth.getUser(token);
+        if(error||!data.user)return send(401,{error:'Kişisel oturumunuz sona erdi. Yeniden giriş yapın.'});
       }
       if(path==='/api/ocr/status'&&req.method==='GET')return send(200,{configured:Boolean(apiKey),provider:'Google Gemini',model:'gemini-2.5-flash'});
       if(path==='/api/ocr'&&req.method==='POST'){
@@ -77,6 +86,6 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   const origin=process.env.RENDER_EXTERNAL_URL||process.env.APP_ORIGIN;
   if(!origin)throw new Error('RENDER_EXTERNAL_URL veya APP_ORIGIN gerekli.');
-  const handler=createApp({password:process.env.APP_PASSWORD,apiKey:process.env.GEMINI_API_KEY?.trim()||'',origin,secure:new URL(origin).protocol==='https:'});
+  const handler=createApp({password:process.env.APP_PASSWORD,apiKey:process.env.GEMINI_API_KEY?.trim()||'',origin,personalAuth:true,secure:new URL(origin).protocol==='https:'});
   createServer(handler).listen(Number(process.env.PORT)||10000,'0.0.0.0',()=>console.log('Sınav Asistanı sunucusu hazır.'));
 }

@@ -10,6 +10,7 @@
     "build:pages": "vite build --base=./ && node scripts/build-pwa.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.468.0",
     "pdfjs-dist": "^6.4.299",

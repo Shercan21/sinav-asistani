@@ -1,34 +1,44 @@
 # Sınav Asistanı
 
-Sınıf, öğrenci, sınav, cevap anahtarı ve değerlendirme yönetimi. Fotoğraf çekimi, çok sayfalı PDF hazırlama, kâğıt üzerine not ekleme ve yedekleme içerir.
+Sınıf, öğrenci, sınav, cevap anahtarı ve değerlendirme yönetimi. Kamera, çok sayfalı PDF, kâğıda not ekleme, kişisel hesap ve bulut eşitleme içerir.
 
-## Bilgisayarda çalıştırma
+## Çalıştırma
 
-Node.js 24 veya üstü gerekir.
+Node.js 24 kullanın. `npm ci` ve `npm run dev` yerel geliştirmeyi başlatır.
+`npm run build:pages` dağıtımı ve uygulama önbelleğini hazırlar.
+Render build: `npm ci --include=dev && npm run build:pages`; start: `node server.mjs`.
+GitHub Pages `main/docs` klasörünü sunar; Node uç noktalarını çalıştırmaz.
 
-```sh
-npm ci
-npm run dev
-```
+## Kişisel hesap ve bulut
 
-Kayıtlar kullanılan tarayıcıda saklanır. Başka cihaza taşımak için Ayarlar → Yedekleme kullanılır.
+`src/cloud-client.mjs` içindeki proje URL'si ve publishable key genel istemci bilgileridir.
+Sunucudaki kişisel kimlik doğrulama aynı projeyi kullanır. Başka projeye geçerken ikisini birlikte değiştirin.
+Supabase SQL Editor'da `supabase-setup.sql` çalıştırılmalıdır.
+Authentication → URL Configuration → Site URL, yayınlanan uygulamanın HTTPS adresi olmalıdır.
+E-posta doğrulaması açık kalır. Supabase'in varsayılan e-posta hizmeti kısıtlıdır; daha geniş kullanıcı kitlesi için SMTP kurulmalıdır.
 
-## GitHub Pages ve telefon
+Her kullanıcı kendi satırına RLS ile erişir; güncellemeler önceki revizyonla karşılaştırılır.
+Kâğıtlar private `exam-papers` alanında hesap klasörüne yazılır.
+Silinen/değiştirilen kâğıtların eski nesneleri bu sürümde otomatik temizlenmez.
+Otomatik eşitleme açık ve görünür sayfada yaklaşık beş saniyede bir denenir.
+Bağlantı kesildiğinde değişiklikler hesapla ayrılmış cihaz önbelleğinde bekler.
+Aynı hesabın iki sekmede aynı anda düzenlenmesi engellenir.
+İki cihaz çakışırsa otomatik üzerine yazılmaz; cihaz yedeği indirildikten sonra bulut sürümü açılabilir.
 
-1. Depoyu GitHub'a yükleyin. Settings → Pages → Source: GitHub Actions seçin.
-2. main dalına gönderildiğinde Pages iş akışı uygulamayı derler ve yayınlar.
-3. Yayın adresini telefonda açın. Android Chrome menüsünden Uygulamayı yükle; iPhone Safari Paylaş menüsünden Ana Ekrana Ekle seçin.
+Eski `sa_classes`, `sa_exams` ve `sa_papers` kayıtları yerinde korunur.
+İlk girişte kullanıcı aktarım düğmesine basana kadar eski kayıtlar buluta gönderilmez.
+Bu aktarım ayrıca JSON yedeği hazırlar. Diğer cihazlarda aynı kişisel hesapla giriş yapılır.
 
-`npm run build:pages` statik dosyaları, uygulama manifestini ve çevrimdışı önbelleği hazırlar. İlk açılış internet gerektirir. Yeni sürüm kullanılabilir olduğunda uygulama bildirim gösterir.
+## Otomatik okuma
 
-**GitHub Pages bir Node.js sunucusu çalıştırmaz.** Sınıf yönetimi, kamera, PDF, notlandırma ve yedekleme tarayıcıda çalışır. Gemini otomatik okuma uç noktası bu statik yayında yoktur. Tam otomatik okuma için ayrıca kimlik doğrulamalı bir sunucu gerekir.
+`GEMINI_API_KEY` yalnızca sunucu ortamında tutulur. `.env`, service-role anahtarı veya öğrenci dosyaları depoya eklenmez.
+Render okuma uç noktası kişisel erişim token'ını Supabase Auth ile doğrular.
+Kâğıt Google Gemini'ye yalnızca kullanıcı o kâğıt için onay verip okuma düğmesine bastığında gönderilir.
+Okuma sonucu öğretmen kontrolü olmadan not olarak kaydedilmez.
+Yerel geliştirme uç noktası yalnızca yerel bağlantıları kabul eder.
 
-## Yerel otomatik okuma
+## Kontroller
 
-Yerel Vite sunucusu `/api/ocr` uç noktasını sağlar. Anahtar yalnızca sunucu tarafında `GEMINI_API_KEY` ortam değişkeninden veya `SHERCAN_ENV_PATH` ile belirtilen .env dosyasından okunur. Varsayılan yerel bağlantı Desktop/SHERCAN_DB_TEST/.env dosyasına bakar.
-
-Anahtar veya .env dosyasını GitHub'a yüklemeyin. VITE_ önekli bir değişkende anahtar kullanmayın. Okuma yalnızca kullanıcı seçili kâğıdın Google Gemini'ye gönderilmesini onaylayıp Kâğıdı oku düğmesine bastığında yapılır. Öğretmen kontrolü olmadan sonuç not olarak kaydedilmez.
-
-## Gizlilik ve sınırlar
-
-Öğrenci kayıtları ve eklenen kâğıtlar bu kaynak kod deposuna dahil değildir. Tarayıcı verileri silindiğinde kayıtlar kaybolabilir; düzenli olarak yedek alın. Sunulan demo ücretsiz plan için toplam 250 öğrenci sınırı uygular. Mobil donanım ve gerçek el yazısı doğruluğu farklı cihaz ve fotoğraflarla ayrıca doğrulanmalıdır.
+Derleme ve mevcut yedekleme, değerlendirme, silme kontrolleri uygulanmıştır.
+Bulutta iki geçici kullanıcı kimliğiyle RLS ayrımı, eski revizyonun reddi ve anonim erişim engeli test edilmiştir; test kayıtları transaction rollback ile kalıcılaştırılmamıştır.
+Gerçek e-posta doğrulaması ve iki fiziksel cihazda ilk aktarım, kullanıcı kendi hesabını açtıktan sonra doğrulanmalıdır.
