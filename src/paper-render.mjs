@@ -8,9 +8,13 @@ export async function openPaper(file){
   const url=URL.createObjectURL(file),image=new Image();try{await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url})}catch{URL.revokeObjectURL(url);throw new Error('Fotoğraf açılamadı.')}
   return {count:1,close:()=>URL.revokeObjectURL(url),render:async()=>{const scale=Math.min(1,2000/Math.max(image.naturalWidth,image.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);return canvas}};
 }
-export async function downloadMarkedPaper(source,items,onProgress){
+export async function downloadMarkedPaper(source,items,onProgress,scoreReport){
   if(source.count>60)throw new Error('Notlu indirme için PDF’yi 60 sayfa veya daha küçük parçalara ayırın.');
   const {jsPDF}=await import('jspdf');let pdf;
   for(let page=1;page<=source.count;page++){onProgress(page,source.count);const canvas=await source.render(page);paintMarks(canvas.getContext('2d'),items,page,canvas.width,canvas.height);const orientation=canvas.width>canvas.height?'landscape':'portrait';if(!pdf)pdf=new jsPDF({orientation,unit:'mm',format:'a4',compress:true});else pdf.addPage('a4',orientation);const width=pdf.internal.pageSize.getWidth(),height=pdf.internal.pageSize.getHeight(),scale=Math.min((width-12)/canvas.width,(height-12)/canvas.height),w=canvas.width*scale,h=canvas.height*scale;pdf.addImage(canvas.toDataURL('image/jpeg',.9),'JPEG',(width-w)/2,(height-h)/2,w,h,undefined,'FAST');canvas.width=0;canvas.height=0}
+  if(scoreReport){
+    const lines=['Değerlendirme çalışma puanları',...scoreReport,'Resmî not için sonuç formundaki kayıt esas alınır.'];
+    for(let offset=0;offset<lines.length;offset+=38){const canvas=document.createElement('canvas');canvas.width=1240;canvas.height=1754;const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,1240,1754);ctx.fillStyle='#111827';ctx.font='26px sans-serif';lines.slice(offset,offset+38).forEach((line,i)=>ctx.fillText(line,70,85+i*40));pdf.addPage('a4','portrait');pdf.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',0,0,210,297);canvas.width=0;canvas.height=0}
+  }
   pdf.save('notlu-sinav-kagidi.pdf');
 }

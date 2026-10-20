@@ -7,9 +7,8 @@ export function assessmentScoreMarks(scores,key,areas){
   const summary=scoreSummary(scores,key);
   if(summary.invalid||summary.completed!==key.length)throw new Error('Tüm soru puanlarını geçerli olarak doldurun.');
   const mark=(id,text,page,x,y,size=.018)=>({id,page,kind:'text',text,x,y,size,color:'#c62828'});
-  let missing=0;
-  return [mark('assessment-total',`Çalışma puanı: ${summary.total.toLocaleString('tr-TR')} / ${summary.max.toLocaleString('tr-TR')}`,1,.03,.015),...scores.map((score,i)=>{
+  return scores.flatMap((score,i)=>{
     const area=areas[i]?.[0],text=`S${i+1}: ${Number(score).toLocaleString('tr-TR')} / ${Number(key[i].max).toLocaleString('tr-TR')}`;
-    return area?mark(`assessment-score-${i}`,text,area.page,Math.min(.8,area.x+.01),Math.max(.055,area.y)):mark(`assessment-score-${i}`,text,1,.03,.06+missing++*.03);
-  })];
+    return area?[mark(`assessment-score-${i}`,text,area.page,Math.min(.8,area.x+.01),Math.max(.005,area.y-.025))]:[];
+  });
 }

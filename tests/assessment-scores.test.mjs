@@ -9,8 +9,8 @@ test('decimal scores sum without rounding drift and blank differs from zero',()=
 });
 test('PDF places marks on matching pages and retains zero and decimal grades',()=>{
  const marks=assessmentScoreMarks([0,2.5],[{max:5},{max:5}],[[{page:2,x:.49,y:.3}],[]]);
- assert.equal(marks[1].page,2);assert.equal(marks[1].text,'S1: 0 / 5');
- assert.equal(marks[2].page,1);assert.match(marks[2].text,/2,5/);
+ assert.equal(marks[0].page,2);assert.equal(marks[0].text,'S1: 0 / 5');
+ assert.equal(marks.length,1);
  assert.throws(()=>assessmentScoreMarks([''],[{max:5}],[[]]));
 });
 
