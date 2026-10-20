@@ -5,6 +5,7 @@ import {getRemote,pushSnapshot,downloadSnapshot,applySnapshot,dirtyKey,revisionK
 import {listPapers,toBase64} from './paper-store.mjs';
 import {validateBackup} from './backup-data.mjs';
 import './account.css';
+import {syncControl} from './sync-control.mjs';
 
 const friendly=error=>error?.code==='40001'||error?.message?.includes('SYNC_CONFLICT')?
   'Başka bir cihazda kayıtlar değişti. Bu cihazdaki değişiklikleri yedekleyip buluttaki sürümü açın.':
@@ -64,7 +65,7 @@ function AccountWorkspace({user,children}) {
             s.ready=true;setPhase('ready');setStatus('İlk bulut kaydı gönderilmeyi bekliyor.');
           } else {
             // Legacy records remain untouched and are never silently uploaded.
-            const raw=localStorage.getItem('sa_classes');setLegacy(raw?JSON.parse(raw):[]);setPhase('setup');
+            const raw=localStorage.getItem('sa_classes');setLegacy(raw?JSON.parse(raw):[]);setStatus('Bağlantı hazır. Başlamak için aşağıdaki seçeneklerden birini seçin.');setPhase('setup');
           }
         }catch(error){setPhase('error');setStatus(friendly(error));}
         await held;
@@ -78,8 +79,8 @@ function AccountWorkspace({user,children}) {
     const s=state.current;
     const changed=()=>{if(!s.ready||s.applying||s.stopped)return;s.sequence++;try{localStorage.setItem(dirtyKey(),'1');setStatus('Değişiklikler buluta gönderilmeyi bekliyor.')}catch{setPhase('error');setStatus('Cihaz kaydı yazılamadı. Önce yedeğinizi indirin.')}};
     const sync=async()=>{
-      if(!s.ready||s.running||s.stopped||document.hidden)return;
-      s.running=true;const seq=s.sequence;
+      if(!s.ready||s.running||s.stopped||document.hidden||syncControl.paused)return;
+      s.running=true;syncControl.running=true;const seq=s.sequence;
       try{
         const revision=Number(localStorage.getItem(revisionKey())||0),dirty=localStorage.getItem(dirtyKey())==='1';
         if(dirty){
@@ -99,7 +100,7 @@ function AccountWorkspace({user,children}) {
           setStatus('Bulut kayıtları güncel.');
         }
       }catch(error){if(error.code==='40001'||error.message?.includes('SYNC_CONFLICT')){s.ready=false;setPhase('conflict');}else if(s.applying){s.ready=false;s.applying=false;setPhase('error');}setStatus(friendly(error));}
-      finally{s.running=false;}
+      finally{s.running=false;syncControl.running=false;}
     };
     window.addEventListener('sa-records-changed',changed);window.addEventListener('online',sync);window.addEventListener('focus',sync);
     const timer=setInterval(sync,5000);return()=>{clearInterval(timer);window.removeEventListener('sa-records-changed',changed);window.removeEventListener('online',sync);window.removeEventListener('focus',sync)};
