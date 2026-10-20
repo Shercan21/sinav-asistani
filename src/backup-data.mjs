@@ -1,3 +1,4 @@
+import {validateWorkflow} from './assessment-data.mjs';
 import {validateMarks} from './paper-marks.mjs';
 import {validateKey, gradeExam} from './exam-data.mjs';
 import {normalizeReading} from './ocr-data.mjs';
@@ -30,6 +31,7 @@ export function validateBackup(data) {
       for(const [studentId,saved] of Object.entries(exam.readings)){
         if(!(classroom.students||[]).some(s=>s.id===studentId)||!saved||!/^[a-f0-9]{64}$/.test(saved.paperFingerprint)||typeof saved.reviewed!=='boolean')fail();
         normalizeReading(saved.reading,exam.questions);
+        if(saved.workflow!==undefined)validateWorkflow(saved.workflow,exam.questions);
         if(saved.proposal!==undefined){
           const proposal=saved.proposal;
           if(!proposal||!/^[a-f0-9]{64}$/.test(proposal.context)||!Array.isArray(proposal.answers)||proposal.answers.length!==exam.questions)fail();

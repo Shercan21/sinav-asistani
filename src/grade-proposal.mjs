@@ -33,6 +33,7 @@ export function normalizeProposal(data,input){
   })};
 }
 export async function proposalContext(key,reading){
-  const bytes=new TextEncoder().encode(JSON.stringify({version:2,key,reading}));
+  const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,stable(value[k])])):value;
+  const bytes=new TextEncoder().encode(JSON.stringify(stable({version:3,key,reading})));
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
