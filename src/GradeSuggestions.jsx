@@ -6,7 +6,7 @@ export default function GradeSuggestions({reading,answerKey,questions,examType,r
   const alive=useRef(true),controller=useRef(null);
   const input={questions,examType,key:answerKey,reading};
   useEffect(()=>{setConfirmed(false)},[reviewed]);
-  useEffect(()=>{alive.current=true;proposalContext(answerKey,reading).then(hash=>{if(!alive.current)return;setContext(hash);if(savedProposal?.context===hash){try{setProposal(normalizeProposal(savedProposal,input));setNotice('Kayıtlı puan önerisi açıldı. Yeniden istemeniz gerekmez.')}catch{}}}).catch(()=>{if(alive.current)setError('Puan önerisi hazırlanamıyor.')});return()=>{alive.current=false;controller.current?.abort()}},[]);
+  useEffect(()=>{alive.current=true;proposalContext(answerKey,reading).then(hash=>{if(!alive.current)return;setContext(hash);if(savedProposal&&savedProposal.context!==hash)setNotice('Okuma, cevap anahtarı veya değerlendirme yöntemi değişti. Eski puan önerisi kullanılmıyor; yeniden öneri alın.');if(savedProposal?.context===hash){try{setProposal(normalizeProposal(savedProposal,input));setNotice('Kayıtlı puan önerisi açıldı. Yeniden istemeniz gerekmez.')}catch{}}}).catch(()=>{if(alive.current)setError('Puan önerisi hazırlanamıyor.')});return()=>{alive.current=false;controller.current?.abort()}},[]);
   const request=async()=>{setBusy(true);setError('');setNotice('');setConfirmed(false);const abort=new AbortController();controller.current=abort;const timer=setTimeout(()=>abort.abort(),130000);try{
     validateGradeInput(input);
     const response=await cloudFetch('/api/ocr/grade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...input,consent}),signal:abort.signal});
