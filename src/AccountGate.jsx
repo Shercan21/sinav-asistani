@@ -5,6 +5,7 @@ import {getRemote,pushSnapshot,downloadSnapshot,applySnapshot,dirtyKey,revisionK
 import {listPapers,toBase64} from './paper-store.mjs';
 import {validateBackup} from './backup-data.mjs';
 import './account.css';
+import StartupSplash from './StartupSplash.jsx';
 import {syncControl} from './sync-control.mjs';
 
 const friendly=error=>error?.code==='40001'||error?.message?.includes('SYNC_CONFLICT')?
@@ -36,7 +37,7 @@ function Login({recovery=false}) {
 export default function AccountGate({children}) {
   const [session,setSession]=useState(undefined),[recovery,setRecovery]=useState(window.location.hash.includes('type=recovery'));
   useEffect(()=>{let live=true;cloud.auth.getSession().then(({data,error})=>{if(live)setSession(error?null:data.session)});const {data}=cloud.auth.onAuthStateChange((event,next)=>{if(event==='PASSWORD_RECOVERY')setRecovery(true);if(live)setSession(next)});return()=>{live=false;data.subscription.unsubscribe()}},[]);
-  if(session===undefined)return <div className="account-screen">Oturum kontrol ediliyor…</div>;
+  if(session===undefined)return <StartupSplash message="Hesabınız açılıyor…"/>;
   if(recovery)return <Login recovery/>;
   if(!session)return <Login/>;
   return <AccountWorkspace key={session.user.id} user={session.user}>{children}</AccountWorkspace>;
@@ -124,5 +125,6 @@ function AccountWorkspace({user,children}) {
   }catch(error){state.current.applying=false;setStatus(friendly(error));}finally{setBusy(false)}};
   const backup=async()=>{setBusy(true);try{download(await snapshot());setBackupDone(true)}catch{setStatus('Yedek hazırlanamadı. Cihaz kayıtları korundu.')}finally{setBusy(false)}};
   const signout=async()=>{if(state.current.running)return;state.current.ready=false;setBusy(true);await cloud.auth.signOut({scope:'local'});window.location.replace('/')};
+  if(phase==='loading')return <StartupSplash message="Bulut kayıtlarınız açılıyor…"/>;
   return <>{phase==='ready'?<><div className="account-bar"><div className="account-summary"><strong>{user.email}</strong><span role="status">{visibleStatus}</span></div><details className="account-details"><summary>Hesabım ve eşitleme</summary><div className="account-details-body"><strong>Kişisel hesabım</strong><p>{user.email}</p><p>{visibleStatus}</p><p>Bilgisayarda ve telefonda aynı hesapla giriş yapın. Uygulama açıkken değişiklikler internet üzerinden otomatik eşitlenir. Diğer cihazda devam etmeden önce “Buluta kaydedildi” veya “Bulut kayıtları güncel” yazısını bekleyin.</p><p>Yedek dosyası almak veya eski kayıtları aktarmak için Ayarlar bölümünü kullanın.</p><button disabled={busy} onClick={signout}>Çıkış yap</button></div></details></div><div key={version}>{children}</div></>:<main className="account-screen"><section className="account-card"><h1>Kişisel çalışma alanı</h1><p>{user.email}</p>{phase==='loading'?<p>Bulut kayıtları açılıyor…</p>:phase==='locked'?<p>Bu hesap başka bir sekmede açık. Diğer sekmeyi kapatıp burayı yenileyin.</p>:phase==='setup'?<><h2>İlk eşitleme</h2><p>Bu hesapta henüz bulut kaydı yok. {legacy?.length||0} sınıf bu tarayıcının önceki kayıtlarında bulunuyor.</p><p>Aktar seçeneği sınıfları, öğrenci adlarını, sınavları, notları ve kâğıtları kendi Supabase projenizde hesabınıza özel alana gönderir. Önceki cihaz kayıtları korunur ve yedek dosyası hazırlanır.</p>{!!legacy?.length&&<button className="primary" disabled={busy} onClick={()=>initialize(true)}>Bu cihazdaki kayıtları hesabıma aktar</button>}<button className="secondary" disabled={busy} onClick={()=>initialize(false)}>Boş hesapla başla</button></>:<><p role="alert">{status}</p>{phase==='conflict'&&<><button className="primary" disabled={busy} onClick={backup}>Önce bu cihazın yedeğini indir</button><button className="secondary" disabled={busy||!backupDone} onClick={()=>{localStorage.removeItem(dirtyKey());window.location.reload()}}>Yedeği aldım, buluttaki sürümü aç</button></>}<button className="secondary" disabled={busy} onClick={()=>window.location.reload()}>Tekrar dene</button></>}{phase==='setup'&&<p role="status">{busy?'Kayıtlar hazırlanıyor…':status}</p>}<button className="secondary" disabled={busy} onClick={signout}>Çıkış yap</button></section></main>}</>;
 }
