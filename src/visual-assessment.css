@@ -3,3 +3,5 @@
 .student-working-toolbar{padding:12px;background:#eef6f0;border:1px solid #c8dfd0;border-radius:10px;margin-top:16px}.student-working-toolbar .point-entry{max-width:420px}.comparison-pair h3,.comparison-pair h4{margin:0 0 12px}
 
 .visual-area-box .area-label{top:auto;bottom:calc(100% + 5px);left:14px;padding:1px 3px;font-size:10px;line-height:1.2;font-weight:400;white-space:nowrap;background:#fffffff0;color:#39614d;border-radius:3px;pointer-events:none}
+
+.visual-area-scroll.has-point-labels{padding-right:54px}.has-point-labels .area-label{width:28px;box-sizing:border-box;text-align:center;background:#f4f8f5;color:#39614d;overflow-wrap:anywhere;white-space:normal}
