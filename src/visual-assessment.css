@@ -15,3 +15,5 @@
 .ink-score-confirm{padding:10px;border:1px solid #d2e3d8;border-radius:8px;margin:10px 0;background:white}.ink-score-confirm img{max-width:140px;max-height:90px;object-fit:contain;display:block}.score-entered>span{color:#28704c}.score-unset>span{color:#9c4a32}
 
 .student-piece-marked{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:5px;align-items:start}.paper-point-marker{width:29px;min-height:29px;box-sizing:border-box;border:2px solid #c62828;border-radius:50%;color:#c62828;background:white;font:600 12px/25px sans-serif;text-align:center;margin-top:6px;overflow-wrap:anywhere;pointer-events:none}.paper-point-marker.unset{color:#97604c;border-color:#97604c}.score-preview .paper-point-marker{font-size:11px}
+
+.symbol-cell-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.symbol-cell-list figure{margin:0;padding:8px;border:1px solid #cad9d1;border-radius:8px;min-width:0}.symbol-cell-list img{max-width:100%;max-height:140px;object-fit:contain;background:white}.symbol-cell-list figcaption{font-size:12px}

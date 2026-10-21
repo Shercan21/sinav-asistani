@@ -27,13 +27,15 @@ export function validateVisualKey(key,count){
 }
 export function validateEvaluation(value,count){
  if(!value||value.version!==1||!hashOK(value.paperFingerprint)||!hashOK(value.keySignature)||!Array.isArray(value.checked)||value.checked.length!==count||value.checked.some(v=>typeof v!=='boolean')||!Array.isArray(value.manualScores)||value.manualScores.length!==count||value.manualScores.some(v=>v!==''&&(typeof v!=='number'||!Number.isFinite(v)||v<0||v>100)))throw new Error('Değerlendirme taslağı geçersiz.');
+ if(value.baseScores!==undefined&&(!Array.isArray(value.baseScores)||value.baseScores.length!==count||value.baseScores.some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0||v>100)))throw new Error('Korunan puanlar geçersiz.');
+ if(value.imageTones!==undefined&&(!Array.isArray(value.imageTones)||value.imageTones.length!==count||value.imageTones.some(v=>!['original','light','dark','contrast'].includes(v))))throw new Error('Görüntü tonu geçersiz.');
  validateAreaRows(value.areas,count);validateMarks({paperFingerprint:value.paperFingerprint,items:value.marks});
  const ids=new Set();for(const m of value.marks){if(!Number.isInteger(m.question)||m.question<1||m.question>count||m.page>12||ids.has(m.id))throw new Error('Puan işareti geçersiz.');ids.add(m.id);if(m.scoreGroup!==undefined&&!idOK(m.scoreGroup))throw new Error('Kalem puan grubu geçersiz.');if(m.score!==undefined&&(m.kind==='text'?pointValue(m.text)!==m.score:m.kind!=='pen'||m.scoreConfirmed!==true||!idOK(m.scoreGroup)||pointValue(String(m.score))!==m.score))throw new Error('Puan yazısı ve değeri uyuşmuyor.');}
  if(!Array.isArray(value.reading)||value.reading.length!==count||value.reading.some(r=>!r||typeof r.text!=='string'||r.text.length>10000||!['unread','read','failed'].includes(r.status)))throw new Error('OCR taslağı geçersiz.');
  for(const r of value.reading){if(r.confidence!==undefined&&(!Number.isFinite(r.confidence)||r.confidence<0||r.confidence>100))throw new Error('OCR kalite bilgisi geçersiz.');if(r.attempts!==undefined&&(!Number.isInteger(r.attempts)||r.attempts<0||r.attempts>72))throw new Error('OCR deneme sayısı geçersiz.');if(r.partsTotal!==undefined&&(!Number.isInteger(r.partsTotal)||r.partsTotal<1||r.partsTotal>24||!Number.isInteger(r.partsRead)||r.partsRead<0||r.partsRead>r.partsTotal))throw new Error('OCR alan bilgisi geçersiz.')}
  return value;
 }
-export function evaluationScores(draft){return draft.manualScores.map((fallback,i)=>{const rows=draft.marks.filter(m=>m.question===i+1&&typeof m.score==='number');return rows.length?roundScore(rows.reduce((n,m)=>n+m.score,0)):fallback})}
+export function evaluationScores(draft){return draft.manualScores.map((fallback,i)=>{const rows=draft.marks.filter(m=>m.question===i+1&&typeof m.score==='number');return rows.length?roundScore(rows.reduce((n,m)=>n+m.score,0)+Number(draft.baseScores?.[i]||0)):fallback})}
 export function freshEvaluation(fingerprint,keySignature,count,previous,savedReading,results=[]){
  if(previous?.paperFingerprint===fingerprint){try{const restored=structuredClone(validateEvaluation(previous,count));if(restored.keySignature!==keySignature){restored.checked=Array(count).fill(false);restored.keySignature=keySignature}return restored}catch{}}
  const legacy=savedReading?.paperFingerprint===fingerprint?savedReading.workflow:null;
@@ -41,3 +43,8 @@ export function freshEvaluation(fingerprint,keySignature,count,previous,savedRea
 }
 export async function visualSignature(key,visual){const bytes=new TextEncoder().encode(JSON.stringify({maxima:key.map(k=>Number(k.max)),visual}));return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('')}
 export function annotationInArea(m,a){const p=m.kind==='pen'?m.points[0]:m;return m.page===a.page&&p.x>=a.x&&p.x<=a.x+a.width&&p.y>=a.y&&p.y<=a.y+a.height}
+
+export function retainScoreOnMarks(draft,marks,index){
+ const had=draft.marks.some(m=>m.question===index+1&&typeof m.score==='number'),has=marks.some(m=>m.question===index+1&&typeof m.score==='number');
+ return {...draft,marks,baseScores:draft.manualScores.map((v,i)=>i===index&&!had&&has?Number(v||0):Number(draft.baseScores?.[i]||0)),manualScores:draft.manualScores.map((v,i)=>i===index&&(had||has)?(!has?Number(draft.baseScores?.[i]||0):0):v),checked:draft.checked.map((v,i)=>i===index?false:v)};
+}
