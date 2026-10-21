@@ -3,7 +3,7 @@ export async function createLocalReader(onProgress){
   const {createWorker}=await import('tesseract.js');
   const worker=await createWorker(['tur','eng'],1,{logger:m=>onProgress?.(`${m.status}${Number.isFinite(m.progress)?` · %${Math.round(m.progress*100)}`:''}`)});
   let closed=false;
-  return {close:async()=>{if(!closed){closed=true;await worker.terminate()}},read:async(image,blocks=false)=>{if(closed)throw new Error('Yerel okuma kapatıldı.');await worker.setParameters({tessedit_pageseg_mode:blocks?'3':'6'});return (await worker.recognize(image,{},blocks?{blocks:true}:{text:true})).data}};
+  return {close:async()=>{if(!closed){closed=true;await worker.terminate()}},read:async(image,blocks=false,mode)=>{if(closed)throw new Error('Yerel okuma kapatıldı.');await worker.setParameters({tessedit_pageseg_mode:mode||(blocks?'3':'6')});return (await worker.recognize(image,{},blocks?{blocks:true}:{text:true})).data}};
 }
 export function blockLines(data,width,height,offset=0,scale=1){
   const lines=[];
