@@ -1,0 +1,1 @@
+export function scoreMarkersForDraft(draft,scores){return scores.flatMap((score,i)=>{const a=draft.areas[i]?.[0];return a?[{question:i+1,page:a.page,score,y:Math.min(1,a.y+Math.min(.025,a.height/2)),side:a.x+a.width/2<.5?'left':'right'}]:[]})}
