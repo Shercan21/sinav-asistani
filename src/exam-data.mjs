@@ -13,15 +13,16 @@ export function parseRoster(text, existing = []) {
 }
 export function validateKey(key, count, type) {
   if (key.length !== count) return false;
-  return key.every(q => Number.isFinite(Number(q.max)) && Number(q.max) > 0 && Number(q.max) <= 100 && (type !== 'Test' || /^[A-E]$/.test(q.answer))) && Math.abs(key.reduce((sum,q)=>sum+Number(q.max),0)-100)<0.001;
+  return key.every(q => Number.isFinite(Number(q.max)) && Number(q.max) > 0 && Number(q.max) <= 100 && (type !== 'Test' || q.visual===true || /^[A-E]$/.test(q.answer))) && Math.abs(key.reduce((sum,q)=>sum+Number(q.max),0)-100)<0.001;
 }
 export function gradeExam(exam, values) {
   if (!validateKey(exam.key || [], exam.questions, exam.type) || values.length !== exam.questions) return null;
+  const useTestChoices=exam.type==='Test'&&(!exam.visualRubric||values.every(v=>/^[A-E-]$/.test(v)));
   let total = 0;
   for (let i = 0; i < exam.questions; i++) {
     const q = exam.key[i], value = values[i];
     if (value === undefined || value === null || value === '') return null;
-    if (exam.type === 'Test') {
+    if (useTestChoices) {
       if (!/^[A-E-]$/.test(value)) return null;
       if (value === q.answer) total += Number(q.max);
     } else {

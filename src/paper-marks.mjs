@@ -13,7 +13,7 @@ export function markTextLayout(mark,width,height,context){
 export function validateMarks(saved){
   if(!saved||!/^[a-f0-9]{64}$/.test(saved.paperFingerprint)||!Array.isArray(saved.items)||saved.items.length>500)throw new Error('Kâğıt notları okunamadı.');
   const point=p=>p&&Number.isFinite(p.x)&&p.x>=0&&p.x<=1&&Number.isFinite(p.y)&&p.y>=0&&p.y<=1;
-  for(const mark of saved.items){if(!mark||typeof mark.id!=='string'||!Number.isInteger(mark.page)||mark.page<1||!/^#[a-f0-9]{6}$/i.test(mark.color))throw new Error('Kâğıt notu geçersiz.');if(mark.kind==='text'){if(!point(mark)||typeof mark.text!=='string'||mark.text.length>1000||!Number.isFinite(mark.size)||mark.size<.008||mark.size>.1)throw new Error('Yazı notu geçersiz.')}else if(mark.kind==='pen'){if(!Array.isArray(mark.points)||mark.points.length<2||mark.points.length>1500||!mark.points.every(point))throw new Error('Kalem notu geçersiz.')}else throw new Error('Not türü geçersiz.')}
+  for(const mark of saved.items){if(!mark||typeof mark.id!=='string'||!Number.isInteger(mark.page)||mark.page<1||!/^#[a-f0-9]{6}$/i.test(mark.color))throw new Error('Kâğıt notu geçersiz.');if(mark.kind==='text'){if(!point(mark)||typeof mark.text!=='string'||mark.text.length>1000||!Number.isFinite(mark.size)||mark.size<(Number.isInteger(mark.question)?.0001:.008)||mark.size>.1)throw new Error('Yazı notu geçersiz.')}else if(mark.kind==='pen'){if(!Array.isArray(mark.points)||mark.points.length<2||mark.points.length>1500||!mark.points.every(point))throw new Error('Kalem notu geçersiz.')}else throw new Error('Not türü geçersiz.')}
   return saved;
 }
 export function paintMarks(ctx,items,page,width,height){

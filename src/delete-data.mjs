@@ -8,6 +8,6 @@ export function planDeletion(classes,exams,target,paperRows=[]) {
   const resultCount=linked.reduce((sum,e)=>sum+(student?(e.results?.[student.id]?1:0):Object.keys(e.results||{}).length),0);
   const omit=(object,id)=>Object.fromEntries(Object.entries(object||{}).filter(([key])=>key!==id));
   const nextClasses=student?classes.map(c=>c.id===classroom.id?{...c,students:c.students.filter(s=>s.id!==student.id),count:Math.max(c.students.length-1,Number(c.count)-1)}:c):classes.filter(c=>c.id!==classroom.id);
-  const nextExams=student?exams.map(e=>linkedIds.has(e.id)?{...e,...Object.fromEntries(['results','readings','paperMarks'].filter(field=>e[field]!==undefined).map(field=>[field,omit(e[field],student.id)]))}:e):exams.filter(e=>!linkedIds.has(e.id));
+  const nextExams=student?exams.map(e=>linkedIds.has(e.id)?{...e,...Object.fromEntries(['results','readings','paperMarks','evaluations'].filter(field=>e[field]!==undefined).map(field=>[field,omit(e[field],student.id)]))}:e):exams.filter(e=>!linkedIds.has(e.id));
   return {classes:nextClasses,exams:nextExams,paperIds:papers.map(([id])=>id),label:student?`${student.number} · ${student.name}`:classroom.name,studentCount:student?1:(classroom.students||[]).length,examCount:student?0:linked.length,resultCount,paperCount:papers.length};
 }

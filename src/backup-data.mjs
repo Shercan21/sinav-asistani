@@ -1,3 +1,4 @@
+import {validateVisualKey,validateEvaluation,validVisualRubric} from './visual-assessment.mjs';
 import {validateWorkflow} from './assessment-data.mjs';
 import {validateMarks} from './paper-marks.mjs';
 import {validateKey, gradeExam} from './exam-data.mjs';
@@ -20,6 +21,9 @@ export function validateBackup(data) {
     if(!idOK(exam.id)||examIds.has(exam.id)||!textOK(exam.name)||!textOK(exam.subject)||!classroom||!['Test','Klasik','Karma'].includes(exam.type)||!Number.isInteger(exam.questions)||exam.questions<1||exam.questions>200)fail();
     examIds.add(exam.id);
     if(exam.key!==undefined&&(!Array.isArray(exam.key)||!validateKey(exam.key,exam.questions,exam.type)))fail();
+    if(exam.visualKeys!==undefined){if(!Array.isArray(exam.visualKeys)||exam.visualKeys.length>200)fail();const ids=new Set();for(const key of exam.visualKeys){validateVisualKey(key,exam.questions);if(ids.has(key.id)||!key.paperId.startsWith(exam.id+':'))fail();ids.add(key.id)}}
+    if(exam.visualRubric!==undefined){validateVisualKey(exam.visualRubric,exam.questions);if(!validVisualRubric(exam.visualRubric.regions)||!exam.visualRubric.paperId.startsWith(exam.id+':'))fail()}
+    if(exam.evaluations!==undefined){if(!exam.evaluations||typeof exam.evaluations!=='object'||Array.isArray(exam.evaluations))fail();for(const [studentId,value] of Object.entries(exam.evaluations)){if(!(classroom.students||[]).some(s=>s.id===studentId))fail();validateEvaluation(value,exam.questions)}}
     if(exam.paperMarks!==undefined){
       if(!exam.paperMarks||typeof exam.paperMarks!=='object'||Array.isArray(exam.paperMarks))fail();
       for(const [studentId,marks] of Object.entries(exam.paperMarks)){
@@ -49,7 +53,7 @@ export function validateBackup(data) {
   for(const p of data.papers){
     const [examId,studentId,...rest]=typeof p.id==='string'?p.id.split(':'):[];
     const exam=data.exams.find(e=>e.id===examId), classroom=data.classes.find(c=>c.name===exam?.className);
-    if(rest.length||!exam||(studentId!=='__answer_key__'&&!(classroom.students||[]).some(s=>s.id===studentId))||paperIds.has(p.id)||!textOK(p.name)||!['image/jpeg','image/png','image/webp','application/pdf'].includes(p.type)||typeof p.base64!=='string'||p.base64.length>20971520||p.base64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(p.base64))fail();
+    if(rest.length||!exam||(studentId!=='__answer_key__'&&!/^__key_[\w-]{1,100}__$/.test(studentId)&&!(classroom.students||[]).some(s=>s.id===studentId))||paperIds.has(p.id)||!textOK(p.name)||!['image/jpeg','image/png','image/webp','application/pdf'].includes(p.type)||typeof p.base64!=='string'||p.base64.length>20971520||p.base64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(p.base64))fail();
     paperIds.add(p.id);
   }
   return data;
