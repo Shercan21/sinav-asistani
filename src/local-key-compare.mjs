@@ -16,8 +16,8 @@ export function compareSymbolCells(student,key,max){
 export async function compareQuestionToKey(paper,studentAreas,keyPaper,keyAreas,reader,signal,tone,onProgress){
  const rows=[];for(let i=0;i<keyAreas.length;i++){signal.throwIfAborted();const area=keyAreas[i],row={max:Number(area.max),score:'',reason:'Öğretmen kontrolü gerekli.'};onProgress?.(`${i+1}/${keyAreas.length} alan anahtarla karşılaştırılıyor…`);
  if(studentAreas.length!==keyAreas.length){rows.push({...row,reason:'Öğrenci ve anahtar alanlarının sayısı farklı. Alanları aynı sırayla seçin.'});continue}
- const key=await readQuestionLocally(keyPaper,[area],reader,signal),student=await readQuestionLocally(paper,[studentAreas[i]],reader,signal,null,tone);signal.throwIfAborted();let compared=compareTextAnswer(student,key,row.max);
- if(compared.score===''){const a=await readPaperSymbols(paper,[studentAreas[i]],reader,signal,tone),b=await readPaperSymbols(keyPaper,[area],reader,signal,'contrast');signal.throwIfAborted();const symbols=compareSymbolCells(a,b,row.max);if(symbols.score!=='')compared=symbols}
+ const a=await readPaperSymbols(paper,[studentAreas[i]],reader,signal,'original'),b=await readPaperSymbols(keyPaper,[area],reader,signal,'original');signal.throwIfAborted();let compared=compareSymbolCells(a,b,row.max);
+ if(compared.score===''){onProgress?.(`${i+1}. alan: görüntüden eşleşme bulunamadı; arka planda OCR metniyle yeniden deneniyor…`);const key=await readQuestionLocally(keyPaper,[area],reader,signal),student=await readQuestionLocally(paper,[studentAreas[i]],reader,signal,null,'original');signal.throwIfAborted();compared=compareTextAnswer(student,key,row.max)}
  rows.push({...row,...compared});
  }return rows;
 }
