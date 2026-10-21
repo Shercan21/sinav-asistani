@@ -23,3 +23,5 @@ export async function compareQuestionToKey(paper,studentAreas,keyPaper,keyAreas,
 }
 export function resetQuestionForReading(draft,index){return {...draft,marks:draft.marks.filter(m=>m.question!==index+1),manualScores:draft.manualScores.map((v,i)=>i===index?0:v),baseScores:draft.manualScores.map((_,i)=>i===index?0:Number(draft.baseScores?.[i]||0)),checked:draft.checked.map((v,i)=>i===index?false:v),reading:draft.reading.map((v,i)=>i===index?{text:'',status:'unread'}:v)}}
 export function proposalContext(draft,index){return JSON.stringify({areas:draft.areas[index],key:draft.keySignature,tone:draft.imageTones?.[index]||'original'})}
+
+export function resetAllForReading(draft){return draft.manualScores.reduce((next,_,i)=>resetQuestionForReading(next,i),draft)}
