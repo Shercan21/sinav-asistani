@@ -3,10 +3,10 @@ import {readPaperSymbols} from './local-symbols.mjs';
 export function normalizedAnswer(text){return String(text||'').normalize('NFKC').toLocaleLowerCase('tr-TR').split('\n').filter(l=>!/^\s*\d+(?:[.,]\d+)?\s*puan\s*$/i.test(l)).join(' ').replace(/^\s*[a-zçğıöşü]\s*[).:]\s*/i,'').replace(/\s+/g,' ').trim()}
 export function compareTextAnswer(student,key,max){
  const a=normalizedAnswer(student.text),b=normalizedAnswer(key.text),unclear={score:'',reason:'Güvenilir eşleşme yok; öğretmen kontrolü gerekli.'};
- if(!a||!b||!Number.isFinite(student.confidence)||!Number.isFinite(key.confidence)||!Number.isFinite(max)||max<=0||student.confidence<85||key.confidence<85)return unclear;
+ if(!a)return {...unclear,reason:'Görüntü iyileştirmelerine rağmen öğrenci cevabından karşılaştırılabilir çıktı alınamadı.'};if(!b)return {...unclear,reason:'Cevap anahtarındaki bu alan güvenilir okunamadı.'};if(!Number.isFinite(student.confidence)||student.confidence<85)return {...unclear,reason:'Öğrenci cevabının OCR güveni karşılaştırma için düşük kaldı.'};if(!Number.isFinite(key.confidence)||key.confidence<85)return {...unclear,reason:'Cevap anahtarındaki alanın OCR güveni düşük kaldı.'};if(!Number.isFinite(max)||max<=0)return {...unclear,reason:'Anahtardaki alan puanı geçerli değil.'};
  if(/(?:soru|aşağıdaki|hangisi|yazınız|açıklayınız|\?)/i.test(b)||!/[a-zçğıöşü]/i.test(b))return unclear;
  if(a===b&&(b.length>=4||(['d','y'].includes(b)&&student.confidence>=95&&key.confidence>=95)))return {score:max,reason:'Anahtar ve öğrenci cevabında yüksek OCR güveniyle aynı ifade bulundu; öğretmen doğrulamalı.'};
- return unclear;
+ return {...unclear,reason:'Okunan cevaplar birebir eşleşmedi. Bu, cevabın yanlış olduğunu göstermez; anlam ve formüller öğretmen kontrolü gerektiriyor.'};
 }
 export function compareSymbolCells(student,key,max){
  if(!key.length||key.length!==student.length)return {score:'',reason:'Hücre sayıları eşleşmedi; alanları kontrol edin.'};
