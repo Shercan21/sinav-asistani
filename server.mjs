@@ -11,7 +11,7 @@ const LOGIN=`<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="vi
 const MIME={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.webmanifest':'application/manifest+json','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const digest=value=>createHash('sha256').update(value).digest();
 const equal=(a,b)=>timingSafeEqual(digest(a),digest(b));
-export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=true,reader=readWithGemini,grader=proposeWithGemini,now=Date.now,secret=randomBytes(32),personalAuth=false}={}) {
+export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=true,reader=readWithGemini,grader=proposeWithGemini,now=Date.now,secret=randomBytes(32),personalAuth=false,geminiOwnerId=process.env.GEMINI_OWNER_USER_ID||'a3c1f7c5-2efc-4f39-a864-3f6593b3bbcb'}={}) {
   if(!personalAuth&&(typeof password!=='string'||password.length<12||password.length>256))throw new Error('APP_PASSWORD en az 12, en fazla 256 karakter olmalı.');
   const allowed=new URL(origin).origin;
   const authClient=personalAuth?createClient('https://veoxuyxrvoytqwhtnfyh.supabase.co','sb_publishable_6zPYtmYT6E_vcarIV7gAnQ_3c3gx75y',{auth:{persistSession:false,autoRefreshToken:false}}):null;
@@ -56,16 +56,22 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         if(path.startsWith('/api/'))return send(401,{error:'Oturum kapandı. Sayfayı yenileyip giriş yapın.'});
         res.writeHead(303,{Location:'/login'});return res.end();
       }
+      let authenticatedUser=null;
       if(authClient&&path.startsWith('/api/ocr')){
         const token=req.headers.authorization?.match(/^Bearer (.{1,8192})$/)?.[1];
         if(!token)return send(401,{error:'Kişisel hesabınıza giriş yapın.'});
         const {data,error}=await authClient.auth.getUser(token);
         if(error||!data.user)return send(401,{error:'Kişisel oturumunuz sona erdi. Yeniden giriş yapın.'});
+        authenticatedUser=data.user;
       }
-      if(path==='/api/ocr/status'&&req.method==='GET')return send(200,{configured:Boolean(apiKey),provider:'Google Gemini',model:'gemini-2.5-flash'});
+      const ownerAccess=!personalAuth||authenticatedUser?.id===geminiOwnerId;
+      if(path==='/api/ocr/status'&&req.method==='GET')return send(200,{configured:Boolean(ownerAccess&&apiKey),provider:'Google Gemini',model:'gemini-2.5-flash'});
       if(['/api/ocr','/api/ocr/grade'].includes(path)&&req.method==='POST'){
         if(req.headers.origin!==allowed||!req.headers['content-type']?.startsWith('application/json'))return send(403,{error:'İstek doğrulanamadı.'});
-        if(!apiKey)return send(503,{error:'Sunucuda Gemini bağlantısı ayarlanmadı.'});
+        const supplied=req.headers['x-gemini-api-key'];
+        if(supplied!==undefined&&(typeof supplied!=='string'||!/^AIza[A-Za-z0-9_-]{20,196}$/.test(supplied)))return send(400,{error:'Geçerli bir Gemini API anahtarı girin.'});
+        const requestKey=supplied||(ownerAccess?apiKey:'');
+        if(!requestKey)return send(403,{error:'Kendi Gemini API anahtarınızı girin.'});
         if(now()-readWindow>=3600000){reads=0;readWindow=now()}
         if(active||now()-lastRead<5000||reads>=20)return send(429,{error:'Okuma sınırına ulaşıldı veya başka okuma sürüyor. Daha sonra tekrar deneyin.'});
         active=true;lastRead=now();reads++;
@@ -73,7 +79,7 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         try{
           const input=JSON.parse(await body(15*1024*1024));
           if(input.consent!==true)return send(400,{error:'Google Gemini’ye gönderim onayı gerekli.'});
-          const result=await (path==='/api/ocr/grade'?grader:reader)(input,{apiKey,signal:abort.signal});return send(200,result);
+          const result=await (path==='/api/ocr/grade'?grader:reader)(input,{apiKey:requestKey,signal:abort.signal});return send(200,result);
         }catch(err){return send(400,{error:err.message==='BODY_LIMIT'?'Dosya çok büyük. En fazla 10 MB seçin.':err instanceof SyntaxError?'Dosya isteği okunamadı.':['AbortError','TimeoutError'].includes(err.name)?'Okuma iptal edildi veya zaman aşımına uğradı.':err.message?.startsWith('fetch')?'Okuma servisine ulaşılamadı.':err.message||'Okuma tamamlanamadı.'})}finally{res.removeListener('close',closed);active=false}
       }
       if(path.startsWith('/api/'))return send(405,{error:'Desteklenmeyen işlem.'});
