@@ -48,3 +48,11 @@ export function retainScoreOnMarks(draft,marks,index){
  const had=draft.marks.some(m=>m.question===index+1&&typeof m.score==='number'),has=marks.some(m=>m.question===index+1&&typeof m.score==='number');
  return {...draft,marks,baseScores:draft.manualScores.map((v,i)=>i===index&&!had&&has?Number(v||0):Number(draft.baseScores?.[i]||0)),manualScores:draft.manualScores.map((v,i)=>i===index&&(had||has)?(!has?Number(draft.baseScores?.[i]||0):0):v),checked:draft.checked.map((v,i)=>i===index?false:v)};
 }
+
+// Explicit teacher bulk confirmation; never invent a missing score.
+export function confirmAllQuestionScores(draft,answerKey){
+ const scores=evaluationScores(draft);
+ const invalid=answerKey.map((key,i)=>scores[i]===''||!Number.isFinite(scores[i])||scores[i]<0||scores[i]>Number(key.max)?i+1:null).filter(Boolean);
+ if(scores.length!==answerKey.length||invalid.length)throw new Error(`${invalid.join(', ')}. sorunun puanını tamamlayın veya soru üst puanını aşmayacak şekilde düzeltin.`);
+ return {...draft,checked:scores.map(()=>true)};
+}
