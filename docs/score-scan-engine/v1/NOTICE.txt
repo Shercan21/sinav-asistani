@@ -1,0 +1,7 @@
+PaddleOCR.js 0.4.2, PP-OCRv6 small detection and recognition models.
+Source: https://github.com/PaddlePaddle/PaddleOCR
+Copyright PaddlePaddle Authors. Apache License 2.0.
+ONNX Runtime Web 1.24.3. Copyright Microsoft Corporation. MIT license.
+OpenCV.js 4.10.0. Copyright OpenCV contributors. Apache License 2.0.
+Bundled worker preserves upstream license notices.
+No student images are included in these assets.
