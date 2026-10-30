@@ -2,6 +2,7 @@ import {cloud,accountConnection} from './cloud-client.mjs';
 import {recordKey,accountId,paperDatabase} from './account-store.mjs';
 import {listPapers,savePapers,deletePapers,toBase64,fromBase64} from './paper-store.mjs';
 import {validateBackup} from './backup-data.mjs';
+import {snapshotScanArchive,prepareScanApply,writeScanArchive,archiveReadyKey} from './scan-archive-store.mjs';
 
 export function metadata() {
   return {classes:JSON.parse(localStorage.getItem(recordKey('sa_classes'))||'[]'),
@@ -11,7 +12,7 @@ export const revisionKey = () => recordKey('sa_cloud_revision');
 export const dirtyKey = () => recordKey('sa_cloud_dirty');
 export async function snapshot() {
   return validateBackup({format:'sinav-asistani',version:1,createdAt:new Date().toISOString(),
-    ...metadata(),papers:await Promise.all((await listPapers()).map(async([id,file])=>
+    ...metadata(),scanArchive:await snapshotScanArchive(),papers:await Promise.all((await listPapers()).map(async([id,file])=>
       ({id,name:file.name,type:file.type,lastModified:file.lastModified,base64:await toBase64(file)})))});
 }
 export async function getRemote() {
@@ -30,9 +31,12 @@ export async function pushSnapshot(userId,expected) {
     if(error&&String(error.statusCode)!=='409'&&error.message!=='The resource already exists')throw error;
     const {base64,...rest}=record;papers.push({...rest,path});
   }
-  const {data:rows,error}=await connection.rpc('save_teacher_records',{expected_revision:expected,new_document:{...data,papers}});
+  const images=[];
+  for(const record of data.scanArchive.images){const file=fromBase64(record),digest=await hash(file),path=`${userId}/${digest}`;const {error}=await connection.storage.from('exam-papers').upload(path,file,{upsert:false,contentType:file.type});if(error&&String(error.statusCode)!=='409'&&error.message!=='The resource already exists')throw error;const {base64,...rest}=record;images.push({...rest,path})}
+  const {data:rows,error}=await connection.rpc('save_teacher_records',{expected_revision:expected,new_document:{...data,papers,scanArchive:{...data.scanArchive,images}}});
   if(error)throw error;
   if(!rows?.[0])throw new Error('Bulut kaydı doğrulanamadı.');
+  if(accountId()===userId)localStorage.setItem(archiveReadyKey(),'1');
   return rows[0];
 }
 export async function downloadSnapshot(row,userId) {
@@ -47,19 +51,30 @@ export async function downloadSnapshot(row,userId) {
     const digest=await hash(file);if(!paper.path.endsWith('/'+digest))throw new Error('Kâğıt bütünlüğü doğrulanamadı.');
     const {path,...rest}=paper;papers.push({...rest,base64:await toBase64(file)});
   }
-  return validateBackup({...doc,papers});
+  let scanArchive;
+  if(doc.scanArchive!==undefined){if(!Array.isArray(doc.scanArchive?.images)||doc.scanArchive.images.length>20000)throw new Error('Tarama arşivi okunamadı.');const images=[];for(const p of doc.scanArchive.images){if(typeof p.path!=='string'||!new RegExp(`^${userId}/[a-f0-9]{64}$`).test(p.path))throw new Error('Tarama yolu doğrulanamadı.');const {data,error}=await cloud.storage.from('exam-papers').download(p.path);if(error)throw error;if(data.size>15728640)throw new Error('Tarama boyutu sınırı aşıldı.');const f=new File([data],p.name,{type:p.type,lastModified:p.lastModified});if(!p.path.endsWith('/'+await hash(f)))throw new Error('Tarama bütünlüğü doğrulanamadı.');const {path,...rest}=p;images.push({...rest,base64:await toBase64(f)})}scanArchive={...doc.scanArchive,images}}
+  return validateBackup({...doc,papers,...(scanArchive?{scanArchive}:{})});
 }
 export async function applySnapshot(data,revision) {
+  validateBackup(data);
+  const owner=accountId(),readyKey=archiveReadyKey(),localDirtyKey=dirtyKey(),beforeArchive=await snapshotScanArchive(),scanPlan=await prepareScanApply(data.scanArchive),oldReady=localStorage.getItem(readyKey),oldDirty=localStorage.getItem(localDirtyKey);let archiveWritten=false;
+  if(owner!==accountId())throw new Error('Hesap değişti.');
   const dbName=paperDatabase(),classesKey=recordKey('sa_classes'),examsKey=recordKey('sa_exams'),revKey=revisionKey();
   const previousPapers=await listPapers(dbName);
   const oldClasses=localStorage.getItem(classesKey),oldExams=localStorage.getItem(examsKey);
   const oldRevision=localStorage.getItem(revKey);
   try {
     await savePapers(data.papers.map(p=>[p.id,fromBase64(p)]),dbName);
+    if(owner!==accountId())throw new Error('Hesap değişti.');
     localStorage.setItem(classesKey,JSON.stringify(data.classes));
     localStorage.setItem(examsKey,JSON.stringify(data.exams));
+    await writeScanArchive(scanPlan.archive,owner);archiveWritten=true;
     localStorage.setItem(revKey,String(revision));
+    if(scanPlan.migrated)localStorage.setItem(localDirtyKey,'1');
   } catch(error) {
+    if(archiveWritten)await writeScanArchive(beforeArchive,owner,true);
+    oldReady===null?localStorage.removeItem(readyKey):localStorage.setItem(readyKey,oldReady);
+    oldDirty===null?localStorage.removeItem(localDirtyKey):localStorage.setItem(localDirtyKey,oldDirty);
     for(const [key,value] of [[classesKey,oldClasses],[examsKey,oldExams]])value===null?localStorage.removeItem(key):localStorage.setItem(key,value);
     oldRevision===null?localStorage.removeItem(revKey):localStorage.setItem(revKey,oldRevision);
     await savePapers(previousPapers,dbName);

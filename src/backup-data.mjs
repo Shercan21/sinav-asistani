@@ -3,6 +3,7 @@ import {validateWorkflow} from './assessment-data.mjs';
 import {validateMarks} from './paper-marks.mjs';
 import {validateKey, gradeExam} from './exam-data.mjs';
 import {normalizeReading} from './ocr-data.mjs';
+import {validateScanArchive,mergeScanArchives} from './scan-archive-data.mjs';
 const idOK=value=>typeof value==='string'&&/^[\w-]{1,100}$/.test(value);
 const textOK=value=>typeof value==='string'&&value.trim().length>0&&value.length<=1000;
 const fail=()=>{throw new Error('Yedek dosyasının içeriği geçersiz veya bu sürümle uyumlu değil.')};
@@ -56,6 +57,7 @@ export function validateBackup(data) {
     if(rest.length||!exam||(studentId!=='__answer_key__'&&!/^__key_[\w-]{1,100}__$/.test(studentId)&&!(classroom.students||[]).some(s=>s.id===studentId))||paperIds.has(p.id)||!textOK(p.name)||!['image/jpeg','image/png','image/webp','application/pdf'].includes(p.type)||typeof p.base64!=='string'||p.base64.length>20971520||p.base64.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(p.base64))fail();
     paperIds.add(p.id);
   }
+  if(data.scanArchive!==undefined)validateScanArchive(data.scanArchive);
   return data;
 }
 const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,stable(value[k])])):value;
@@ -73,5 +75,6 @@ export function mergeBackup(current,incoming){
     return result;
   };
   const merged={...current,classes:merge(current.classes,incoming.classes,'Sınıf'),exams:merge(current.exams,incoming.exams,'Sınav'),papers:merge(current.papers,incoming.papers,'Sınav kâğıdı')};
+  const archive=mergeScanArchives(current.scanArchive,incoming.scanArchive);if(archive)merged.scanArchive=archive;
   validateBackup(merged);return merged;
 }

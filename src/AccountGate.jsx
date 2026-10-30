@@ -64,7 +64,7 @@ function AccountWorkspace({user,children}) {
             if(localStorage.getItem(dirtyKey())==='1'){
               if(localRev!==row.revision){setPhase('conflict');setStatus('Cihazlar arasında farklı kayıtlar var.');}
               else {s.ready=true;setPhase('ready');setStatus('Cihazdaki değişiklikler gönderilmeyi bekliyor.');}
-            }else {s.applying=true;const data=await downloadSnapshot(row,user.id);if(s.stopped)return;await applySnapshot(data,row.revision);s.applying=false;s.ready=true;setPhase('ready');setStatus('Bulut kayıtları güncel.');}
+            }else {s.applying=true;const data=await downloadSnapshot(row,user.id);if(s.stopped)return;await applySnapshot(data,row.revision);s.applying=false;s.ready=true;setPhase('ready');setStatus(localStorage.getItem(dirtyKey())==='1'?'Taramalar buluta gönderilmeyi bekliyor.':'Bulut kayıtları güncel.');}
           } else if(localStorage.getItem(dirtyKey())==='1') {
             s.ready=true;setPhase('ready');setStatus('İlk bulut kaydı gönderilmeyi bekliyor.');
           } else {
@@ -101,7 +101,7 @@ function AccountWorkspace({user,children}) {
             s.ready=false;s.applying=true;setPhase('loading');await applySnapshot(data,row.revision);
             s.applying=false;s.ready=true;setVersion(v=>v+1);setPhase('ready');
           }
-          setStatus('Bulut kayıtları güncel.');
+          setStatus(localStorage.getItem(dirtyKey())==='1'?'Taramalar buluta gönderilmeyi bekliyor.':'Bulut kayıtları güncel.');
         }
       }catch(error){if(error.code==='40001'||error.message?.includes('SYNC_CONFLICT')){s.ready=false;setPhase('conflict');}else if(s.applying){s.ready=false;s.applying=false;setPhase('error');}setStatus(friendly(error));}
       finally{s.running=false;syncControl.running=false;}
