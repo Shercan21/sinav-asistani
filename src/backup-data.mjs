@@ -4,6 +4,7 @@ import {validateMarks} from './paper-marks.mjs';
 import {validateKey, gradeExam} from './exam-data.mjs';
 import {normalizeReading} from './ocr-data.mjs';
 import {validateScanArchive,mergeScanArchives} from './scan-archive-data.mjs';
+import {validAnalysisMeta} from './analysis-data.mjs';
 const idOK=value=>typeof value==='string'&&/^[\w-]{1,100}$/.test(value);
 const textOK=value=>typeof value==='string'&&value.trim().length>0&&value.length<=1000;
 const fail=()=>{throw new Error('Yedek dosyasının içeriği geçersiz veya bu sürümle uyumlu değil.')};
@@ -21,6 +22,7 @@ export function validateBackup(data) {
     const classroom=data.classes.find(c=>c.name===exam.className);
     if(!idOK(exam.id)||examIds.has(exam.id)||!textOK(exam.name)||!textOK(exam.subject)||!classroom||!['Test','Klasik','Karma'].includes(exam.type)||!Number.isInteger(exam.questions)||exam.questions<1||exam.questions>200)fail();
     examIds.add(exam.id);
+    if(!validAnalysisMeta(exam.analysis,exam.questions))fail();
     if(exam.key!==undefined&&(!Array.isArray(exam.key)||!validateKey(exam.key,exam.questions,exam.type)))fail();
     if(exam.visualKeys!==undefined){if(!Array.isArray(exam.visualKeys)||exam.visualKeys.length>200)fail();const ids=new Set();for(const key of exam.visualKeys){validateVisualKey(key,exam.questions);if(ids.has(key.id)||!key.paperId.startsWith(exam.id+':'))fail();ids.add(key.id)}}
     if(exam.visualRubric!==undefined){validateVisualKey(exam.visualRubric,exam.questions);if(!validVisualRubric(exam.visualRubric.regions)||!exam.visualRubric.paperId.startsWith(exam.id+':'))fail()}
