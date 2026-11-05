@@ -1,3 +1,4 @@
+import {linkedRubricReady} from './rubric-links.mjs';
 import {validateVisualKey,validateEvaluation,validVisualRubric} from './visual-assessment.mjs';
 import {validateWorkflow} from './assessment-data.mjs';
 import {validateMarks} from './paper-marks.mjs';
@@ -25,7 +26,7 @@ export function validateBackup(data) {
     if(!validAnalysisMeta(exam.analysis,exam.questions))fail();
     if(exam.key!==undefined&&(!Array.isArray(exam.key)||!validateKey(exam.key,exam.questions,exam.type)))fail();
     if(exam.visualKeys!==undefined){if(!Array.isArray(exam.visualKeys)||exam.visualKeys.length>200)fail();const ids=new Set();for(const key of exam.visualKeys){validateVisualKey(key,exam.questions);if(ids.has(key.id)||!key.paperId.startsWith(exam.id+':'))fail();ids.add(key.id)}}
-    if(exam.visualRubric!==undefined){validateVisualKey(exam.visualRubric,exam.questions);if(!validVisualRubric(exam.visualRubric.regions)||!exam.visualRubric.paperId.startsWith(exam.id+':'))fail()}
+    if(exam.visualRubric!==undefined){validateVisualKey(exam.visualRubric,exam.questions);if(!validVisualRubric(exam.visualRubric.regions)||(exam.visualRubric.answerRegions&&!linkedRubricReady(exam.visualRubric))||!exam.visualRubric.paperId.startsWith(exam.id+':'))fail()}
     if(exam.evaluations!==undefined){if(!exam.evaluations||typeof exam.evaluations!=='object'||Array.isArray(exam.evaluations))fail();for(const [studentId,value] of Object.entries(exam.evaluations)){if(!(classroom.students||[]).some(s=>s.id===studentId))fail();validateEvaluation(value,exam.questions)}}
     if(exam.paperMarks!==undefined){
       if(!exam.paperMarks||typeof exam.paperMarks!=='object'||Array.isArray(exam.paperMarks))fail();

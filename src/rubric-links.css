@@ -1,0 +1,7 @@
+.rubric-link-card{padding:12px;border:1px solid #bcd6c8;border-radius:10px;background:#f5faf7;margin:12px 0}.rubric-link-card input:not([type=checkbox]){width:100%;max-width:420px}.rubric-zone-choice{display:flex!important;gap:8px;align-items:center}.rubric-zone-choice input{width:auto!important;min-width:0!important}.criterion-point-list{display:flex;gap:6px;flex-wrap:wrap;padding:5px 0}.criterion-point-list span{font-size:12px;color:#a92727;background:#fff3d3;border-radius:4px;padding:2px 6px;border-bottom:2px solid #e5bb54}.criterion-breakdown{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;padding:6px 0}.rubric-search-note{font-size:12px;color:#547360}
+.student-piece-marked:has(.criterion-point-list:not(:empty)){grid-template-columns:minmax(0,1fr) 58px}
+.criterion-point-list:empty{display:none}
+.criterion-point-list span{white-space:nowrap}
+.student-piece-marked:has(.criterion-point-list:not(:empty))>.paper-point-marker{grid-column:2}
+.identity-region-settings{margin:18px 0;padding:12px;border:1px solid #c8dfd0;border-radius:10px}
+.identity-region-settings>summary{cursor:pointer;font-weight:600}
