@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {cloud,availableProviders} from './cloud-client.mjs';
+import {cloud,availableProviders,rememberCloudSession} from './cloud-client.mjs';
 import {selectAccount,recordKey,accountId,paperDatabase} from './account-store.mjs';
 import {getRemote,pushSnapshot,downloadSnapshot,applySnapshot,dirtyKey,revisionKey,snapshot} from './cloud-sync.mjs';
 import {listPapers,toBase64} from './paper-store.mjs';
@@ -36,7 +36,7 @@ function Login({recovery=false}) {
 
 export default function AccountGate({children}) {
   const [session,setSession]=useState(undefined),[recovery,setRecovery]=useState(window.location.hash.includes('type=recovery'));
-  useEffect(()=>{let live=true;cloud.auth.getSession().then(({data,error})=>{if(live)setSession(error?null:data.session)});const {data}=cloud.auth.onAuthStateChange((event,next)=>{if(event==='PASSWORD_RECOVERY')setRecovery(true);if(live)setSession(next)});return()=>{live=false;data.subscription.unsubscribe()}},[]);
+  useEffect(()=>{let live=true;cloud.auth.getSession().then(({data,error})=>{if(live){rememberCloudSession(error?null:data.session);setSession(error?null:data.session)}});const {data}=cloud.auth.onAuthStateChange((event,next)=>{rememberCloudSession(next);setTimeout(()=>{if(!live)return;if(event==='PASSWORD_RECOVERY')setRecovery(true);setSession(next)},0)});return()=>{live=false;data.subscription.unsubscribe()}},[]);
   if(session===undefined)return <StartupSplash message="Hesabınız açılıyor…"/>;
   if(recovery)return <Login recovery/>;
   if(!session)return <Login/>;

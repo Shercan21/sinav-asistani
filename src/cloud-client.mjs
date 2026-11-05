@@ -1,3 +1,5 @@
+import {createSessionAccess} from './cloud-session.mjs';
+import {cloudReadDeadline} from './cloud-download-cache.mjs';
 import {ensureGeminiAccess,forgetGeminiKey,clearGeminiKeys} from './gemini-access.mjs';
 import {createClient} from '@supabase/supabase-js';
 const url='https://veoxuyxrvoytqwhtnfyh.supabase.co';
@@ -9,11 +11,13 @@ export async function availableProviders() {
   if(!response.ok)throw new Error('Provider settings unavailable');
   const data=await response.json();return data.external||{};
 }
+const sessionAccess=createSessionAccess(async()=>{const {data,error}=await cloudReadDeadline(()=>cloud.auth.getSession());if(error)throw error;return data.session});
+export const rememberCloudSession=session=>sessionAccess.remember(session);
+let scopedConnection=null,scopedUser='';
 export async function accountConnection(userId) {
-  const {data:{session}}=await cloud.auth.getSession();
-  if(session?.user.id!==userId)throw new Error('Account changed');
-  return createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
-    global:{headers:{Authorization:`Bearer ${session.access_token}`}}});
+  await sessionAccess.token(userId);
+  if(!scopedConnection||scopedUser!==userId){scopedUser=userId;scopedConnection=createClient(url,key,{accessToken:()=>sessionAccess.token(userId)})}
+  return scopedConnection;
 }
 let geminiAccount='';
 export async function prepareGeminiAccess(){
@@ -25,7 +29,7 @@ export async function prepareGeminiAccess(){
  if((current?.user.id||'local')!==id){clearGeminiKeys();throw new Error('Hesap değişti. Okumayı yeniden başlatın.')}
  return {key,id};
 }
-cloud.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){clearGeminiKeys();geminiAccount=''}});
+cloud.auth.onAuthStateChange((event,session)=>{rememberCloudSession(session);if(event==='SIGNED_OUT'){clearGeminiKeys();geminiAccount=''}});
 export async function cloudFetch(url,options={}) {
  let access;if(options.method==='POST'&&['/api/ocr','/api/ocr/grade'].includes(url))access=await prepareGeminiAccess();
  const {data:{session}} = await cloud.auth.getSession();
