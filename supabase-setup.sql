@@ -31,7 +31,7 @@ begin
       where user_id = current_user_id and revision = expected_revision;
   end if;
   get diagnostics affected = row_count;
-  if affected = 0 then raise exception 'SYNC_CONFLICT' using errcode = '40001'; end if;
+  if affected = 0 then raise sqlstate 'PT409' using message = 'SYNC_CONFLICT'; end if;
   return query select * from public.teacher_records where user_id = current_user_id;
 end;
 $$;
@@ -47,3 +47,4 @@ drop policy if exists own_paper_files on storage.objects;
 create policy own_paper_files on storage.objects for all to authenticated
 using (bucket_id = 'exam-papers' and (storage.foldername(name))[1] = (select auth.uid())::text)
 with check (bucket_id = 'exam-papers' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
