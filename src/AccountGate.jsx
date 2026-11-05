@@ -8,7 +8,7 @@ import './account.css';
 import StartupSplash from './StartupSplash.jsx';
 import {syncControl} from './sync-control.mjs';
 
-const friendly=error=>error?.code==='40001'||error?.message?.includes('SYNC_CONFLICT')?
+const friendly=error=>error?.code==='CLOUD_VALIDATION'?`Bulut kaydı doğrulanamadı: ${error.message}`:error?.code==='CLOUD_TIMEOUT'?error.message:error?.code==='40001'||error?.message?.includes('SYNC_CONFLICT')?
   'Başka bir cihazda kayıtlar değişti. Bu cihazdaki değişiklikleri yedekleyip buluttaki sürümü açın.':
   error?.message==='Invalid login credentials'?'E-posta veya şifre yanlış.':
   error?.message==='Email not confirmed'?'Önce e-postanıza gelen doğrulama bağlantısını açın.':
@@ -58,20 +58,20 @@ function AccountWorkspace({user,children}) {
         if(!lock){setPhase('locked');return;}
         const held=new Promise(resolve=>{s.release=resolve});
         try {
-          const row=await getRemote();if(s.stopped)return;
+          setStatus('Sınıf ve sınav listesi buluttan alınıyor…');const row=await getRemote();if(s.stopped)return;
           if(row){
             const localRev=Number(localStorage.getItem(revisionKey())||0);
             if(localStorage.getItem(dirtyKey())==='1'){
               if(localRev!==row.revision){setPhase('conflict');setStatus('Cihazlar arasında farklı kayıtlar var.');}
               else {s.ready=true;setPhase('ready');setStatus('Cihazdaki değişiklikler gönderilmeyi bekliyor.');}
-            }else {s.applying=true;const data=await downloadSnapshot(row,user.id);if(s.stopped)return;await applySnapshot(data,row.revision);s.applying=false;s.ready=true;setPhase('ready');setStatus(localStorage.getItem(dirtyKey())==='1'?'Taramalar buluta gönderilmeyi bekliyor.':'Bulut kayıtları güncel.');}
+            }else {s.applying=true;const data=await downloadSnapshot(row,user.id,message=>{if(!s.stopped)setStatus(message)});if(s.stopped)return;await applySnapshot(data,row.revision);s.applying=false;s.ready=true;setPhase('ready');setStatus(localStorage.getItem(dirtyKey())==='1'?'Taramalar buluta gönderilmeyi bekliyor.':'Bulut kayıtları güncel.');}
           } else if(localStorage.getItem(dirtyKey())==='1') {
             s.ready=true;setPhase('ready');setStatus('İlk bulut kaydı gönderilmeyi bekliyor.');
           } else {
             // Legacy records remain untouched and are never silently uploaded.
             const raw=localStorage.getItem('sa_classes');setLegacy(raw?JSON.parse(raw):[]);setStatus('Bağlantı hazır. Başlamak için aşağıdaki seçeneklerden birini seçin.');setPhase('setup');
           }
-        }catch(error){setPhase('error');setStatus(friendly(error));}
+        }catch(error){console.warn('Bulut açılışı tamamlanamadı',{code:String(error?.code||''),message:String(error?.message||'').slice(0,200)});setPhase('error');setStatus(friendly(error));}
         await held;
       });
     }catch(error){setPhase('error');setStatus(friendly(error));}};
@@ -96,7 +96,7 @@ function AccountWorkspace({user,children}) {
         }else{
           const row=await getRemote();if(s.stopped)return;
           if(row&&row.revision!==revision){
-            const data=await downloadSnapshot(row,user.id);if(s.stopped)return;
+            const data=await downloadSnapshot(row,user.id,message=>{if(!s.stopped)setStatus(message)});if(s.stopped)return;
             if(seq!==s.sequence||localStorage.getItem(dirtyKey())==='1')throw {code:'40001'};
             s.ready=false;s.applying=true;setPhase('loading');await applySnapshot(data,row.revision);
             s.applying=false;s.ready=true;setVersion(v=>v+1);setPhase('ready');
@@ -125,6 +125,6 @@ function AccountWorkspace({user,children}) {
   }catch(error){state.current.applying=false;setStatus(friendly(error));}finally{setBusy(false)}};
   const backup=async()=>{setBusy(true);try{download(await snapshot());setBackupDone(true)}catch{setStatus('Yedek hazırlanamadı. Cihaz kayıtları korundu.')}finally{setBusy(false)}};
   const signout=async()=>{if(state.current.running)return;state.current.ready=false;setBusy(true);await cloud.auth.signOut({scope:'local'});window.location.replace('/')};
-  if(phase==='loading')return <StartupSplash message="Bulut kayıtlarınız açılıyor…"/>;
+  if(phase==='loading')return <StartupSplash message={status}/>;
   return <>{phase==='ready'?<><div className="account-bar"><div className="account-summary"><strong>{user.email}</strong><span role="status">{visibleStatus}</span></div><details className="account-details"><summary>Hesabım ve eşitleme</summary><div className="account-details-body"><strong>Kişisel hesabım</strong><p>{user.email}</p><p>{visibleStatus}</p><p>Bilgisayarda ve telefonda aynı hesapla giriş yapın. Uygulama açıkken değişiklikler internet üzerinden otomatik eşitlenir. Diğer cihazda devam etmeden önce “Buluta kaydedildi” veya “Bulut kayıtları güncel” yazısını bekleyin.</p><p>Yedek dosyası almak veya eski kayıtları aktarmak için Ayarlar bölümünü kullanın.</p><button disabled={busy} onClick={signout}>Çıkış yap</button></div></details></div><div key={version}>{children}</div></>:<main className="account-screen"><section className="account-card"><h1>Kişisel çalışma alanı</h1><p>{user.email}</p>{phase==='loading'?<p>Bulut kayıtları açılıyor…</p>:phase==='locked'?<p>Bu hesap başka bir sekmede açık. Diğer sekmeyi kapatıp burayı yenileyin.</p>:phase==='setup'?<><h2>İlk eşitleme</h2><p>Bu hesapta henüz bulut kaydı yok. {legacy?.length||0} sınıf bu tarayıcının önceki kayıtlarında bulunuyor.</p><p>Aktar seçeneği sınıfları, öğrenci adlarını, sınavları, notları ve kâğıtları kendi Supabase projenizde hesabınıza özel alana gönderir. Önceki cihaz kayıtları korunur ve yedek dosyası hazırlanır.</p>{!!legacy?.length&&<button className="primary" disabled={busy} onClick={()=>initialize(true)}>Bu cihazdaki kayıtları hesabıma aktar</button>}<button className="secondary" disabled={busy} onClick={()=>initialize(false)}>Boş hesapla başla</button></>:<><p role="alert">{status}</p>{phase==='conflict'&&<><button className="primary" disabled={busy} onClick={backup}>Önce bu cihazın yedeğini indir</button><button className="secondary" disabled={busy||!backupDone} onClick={()=>{localStorage.removeItem(dirtyKey());window.location.reload()}}>Yedeği aldım, buluttaki sürümü aç</button></>}<button className="secondary" disabled={busy} onClick={()=>window.location.reload()}>Tekrar dene</button></>}{phase==='setup'&&<p role="status">{busy?'Kayıtlar hazırlanıyor…':status}</p>}<button className="secondary" disabled={busy} onClick={signout}>Çıkış yap</button></section></main>}</>;
 }

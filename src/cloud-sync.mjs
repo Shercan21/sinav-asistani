@@ -1,6 +1,7 @@
+import {verifiedCachedPaper,cloudReadDeadline} from './cloud-download-cache.mjs';
 import {cloud,accountConnection} from './cloud-client.mjs';
 import {recordKey,accountId,paperDatabase} from './account-store.mjs';
-import {listPapers,savePapers,deletePapers,toBase64,fromBase64} from './paper-store.mjs';
+import {listPapers,readPaper,savePapers,deletePapers,toBase64,fromBase64} from './paper-store.mjs';
 import {validateBackup} from './backup-data.mjs';
 import {snapshotScanArchive,prepareScanApply,writeScanArchive,archiveReadyKey} from './scan-archive-store.mjs';
 
@@ -16,7 +17,7 @@ export async function snapshot() {
       ({id,name:file.name,type:file.type,lastModified:file.lastModified,base64:await toBase64(file)})))});
 }
 export async function getRemote() {
-  const {data,error}=await cloud.from('teacher_records').select('*').maybeSingle();
+  const {data,error}=await cloudReadDeadline(()=>cloud.from('teacher_records').select('*').maybeSingle());
   if(error)throw error;return data;
 }
 const hash = async file => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer())),x=>x.toString(16).padStart(2,'0')).join('');
@@ -39,21 +40,23 @@ export async function pushSnapshot(userId,expected) {
   if(accountId()===userId)localStorage.setItem(archiveReadyKey(),'1');
   return rows[0];
 }
-export async function downloadSnapshot(row,userId) {
+export async function downloadSnapshot(row,userId,onProgress=()=>{}) {
   const doc=row.document;
   if(!Array.isArray(doc?.papers))throw new Error('Bulut kaydı okunamadı.');
   const papers=[];
   for(const paper of doc.papers) {
+    onProgress(`Kâğıtlar açılıyor: ${papers.length+1} / ${doc.papers.length}`);
     if(typeof paper.path!=='string'||!new RegExp(`^${userId}/[a-f0-9]{64}$`).test(paper.path))throw new Error('Kâğıt yolu doğrulanamadı.');
-    const {data,error}=await cloud.storage.from('exam-papers').download(paper.path);if(error)throw error;
+    const cached=await verifiedCachedPaper(paper,userId,id=>readPaper(id),hash);
+    const {data,error}=cached?{data:cached,error:null}:await cloudReadDeadline(()=>cloud.storage.from('exam-papers').download(paper.path));if(error)throw error;
     if(data.size>15728640)throw new Error('Kâğıt boyutu sınırı aşıldı.');
     const file=new File([data],paper.name,{type:paper.type,lastModified:paper.lastModified});
     const digest=await hash(file);if(!paper.path.endsWith('/'+digest))throw new Error('Kâğıt bütünlüğü doğrulanamadı.');
     const {path,...rest}=paper;papers.push({...rest,base64:await toBase64(file)});
   }
   let scanArchive;
-  if(doc.scanArchive!==undefined){if(!Array.isArray(doc.scanArchive?.images)||doc.scanArchive.images.length>20000)throw new Error('Tarama arşivi okunamadı.');const images=[];for(const p of doc.scanArchive.images){if(typeof p.path!=='string'||!new RegExp(`^${userId}/[a-f0-9]{64}$`).test(p.path))throw new Error('Tarama yolu doğrulanamadı.');const {data,error}=await cloud.storage.from('exam-papers').download(p.path);if(error)throw error;if(data.size>15728640)throw new Error('Tarama boyutu sınırı aşıldı.');const f=new File([data],p.name,{type:p.type,lastModified:p.lastModified});if(!p.path.endsWith('/'+await hash(f)))throw new Error('Tarama bütünlüğü doğrulanamadı.');const {path,...rest}=p;images.push({...rest,base64:await toBase64(f)})}scanArchive={...doc.scanArchive,images}}
-  return validateBackup({...doc,papers,...(scanArchive?{scanArchive}:{})});
+  if(doc.scanArchive!==undefined){if(!Array.isArray(doc.scanArchive?.images)||doc.scanArchive.images.length>20000)throw new Error('Tarama arşivi okunamadı.');const images=[];for(const p of doc.scanArchive.images){if(typeof p.path!=='string'||!new RegExp(`^${userId}/[a-f0-9]{64}$`).test(p.path))throw new Error('Tarama yolu doğrulanamadı.');onProgress(`Tarama arşivi açılıyor: ${images.length+1} / ${doc.scanArchive.images.length}`);const {data,error}=await cloudReadDeadline(()=>cloud.storage.from('exam-papers').download(p.path));if(error)throw error;if(data.size>15728640)throw new Error('Tarama boyutu sınırı aşıldı.');const f=new File([data],p.name,{type:p.type,lastModified:p.lastModified});if(!p.path.endsWith('/'+await hash(f)))throw new Error('Tarama bütünlüğü doğrulanamadı.');const {path,...rest}=p;images.push({...rest,base64:await toBase64(f)})}scanArchive={...doc.scanArchive,images}}
+  onProgress('Sınıf, sınav ve puan kayıtları doğrulanıyor…');try{return validateBackup({...doc,papers,...(scanArchive?{scanArchive}:{})})}catch(error){error.code='CLOUD_VALIDATION';throw error}
 }
 export async function applySnapshot(data,revision) {
   validateBackup(data);
