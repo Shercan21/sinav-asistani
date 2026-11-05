@@ -1,3 +1,4 @@
+import {validateCriterionAlternatives} from './criterion-alternatives.mjs';
 import {validateIdentityRegions} from './identity-regions.mjs';
 import {validArea} from './assessment-data.mjs';
 const idOK=s=>typeof s==='string'&&/^[\w-]{1,100}$/.test(s);
@@ -9,7 +10,7 @@ export function upgradeRubricKey(key){
  const next=structuredClone(key);next.answerRegions=keyAnswerAreas(next);next.regions=next.regions.map((rows,q)=>rows.map((a,i)=>({...a,label:a.label??`${i+1}. ölçüt`,answerAreaIds:a.answerAreaIds??next.answerRegions[q].map(b=>b.id)})));return next;
 }
 export function validateRubricLinks(key,count){
- validateIdentityRegions(key.identityRegions);
+ validateIdentityRegions(key.identityRegions);for(const rows of key.regions)for(const c of rows)validateCriterionAlternatives(c.alternatives);
  if(key.regions.some(rows=>rows.some(a=>a.label!==undefined&&(typeof a.label!=='string'||a.label.length>200))))throw new Error('Ölçüt adı geçersiz.');
  if(key.answerRegions===undefined){if(key.regions.some(rows=>rows.some(a=>a.answerAreaIds!==undefined)))throw new Error('Ölçütün cevap alanı tanımı eksik.');return key}
  if(!Array.isArray(key.answerRegions)||key.answerRegions.length!==count)throw new Error('Cevabın aranacağı alanlar geçersiz.');const ids=new Set();

@@ -4,6 +4,6 @@ export function visualSearchRubric(rubric){
   const ids=r.answerAreaIds||[],templates=(q.answerAreas||[]).filter(a=>ids.includes(a.id));
   const hints=(q.studentSearchAreas||[]).filter(a=>!a.answerAreaId||ids.includes(a.answerAreaId));
   const {page,x,y,width,height}=r;
-  return{region:i+1,label:r.label||`${i+1}. ölçüt`,max:r.max,reference:{document:'answer-key',area:{page,x,y,width,height}},search:{document:'student',scope:templates.length?'entire-linked-answer-areas':'entire-question-answer',answerAreaIds:ids,answerAreaTemplates:templates,locationHints:hints,requireSamePosition:false}};
+  return{region:i+1,label:r.label||`${i+1}. ölçüt`,max:r.max,acceptableAlternatives:r.alternatives||[],reference:{document:'answer-key',area:{page,x,y,width,height}},search:{document:'student',scope:templates.length?'entire-linked-answer-areas':'entire-question-answer',answerAreaIds:ids,answerAreaTemplates:templates,locationHints:hints,requireSamePosition:false}};
  })}));
 }

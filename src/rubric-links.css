@@ -5,3 +5,5 @@
 .student-piece-marked:has(.criterion-point-list:not(:empty))>.paper-point-marker{grid-column:2}
 .identity-region-settings{margin:18px 0;padding:12px;border:1px solid #c8dfd0;border-radius:10px}
 .identity-region-settings>summary{cursor:pointer;font-weight:600}
+
+.question-alternatives textarea{display:block;box-sizing:border-box;width:100%;min-height:110px;padding:10px;font:inherit;resize:vertical}.question-alternatives .question-piece{max-width:560px}.question-alternatives small{display:block;margin-top:6px;color:#526b59}
