@@ -1,3 +1,4 @@
+import {readTeacherRecord} from './cloud-record-read.mjs';
 import {createSessionAccess} from './cloud-session.mjs';
 import {cloudReadDeadline} from './cloud-download-cache.mjs';
 import {ensureGeminiAccess,forgetGeminiKey,clearGeminiKeys} from './gemini-access.mjs';
@@ -37,3 +38,6 @@ export async function cloudFetch(url,options={}) {
  if(access?.key&&response.status===400){const result=await response.clone().json().catch(()=>null);if(/anahtar|erişim/.test(result?.error||''))forgetGeminiKey(access.id)}
  return response;
 }
+
+export async function readCloudRecord(userId){const token=await sessionAccess.token(userId);return cloudReadDeadline(()=>readTeacherRecord({url,key,token,signal:AbortSignal.timeout(30000)}))}
+

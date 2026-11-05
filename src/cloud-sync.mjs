@@ -1,5 +1,5 @@
 import {verifiedCachedPaper,cloudReadDeadline} from './cloud-download-cache.mjs';
-import {cloud,accountConnection} from './cloud-client.mjs';
+import {cloud,accountConnection,readCloudRecord} from './cloud-client.mjs';
 import {recordKey,accountId,paperDatabase} from './account-store.mjs';
 import {listPapers,readPaper,savePapers,deletePapers,toBase64,fromBase64} from './paper-store.mjs';
 import {validateBackup} from './backup-data.mjs';
@@ -16,10 +16,7 @@ export async function snapshot() {
     ...metadata(),scanArchive:await snapshotScanArchive(),papers:await Promise.all((await listPapers()).map(async([id,file])=>
       ({id,name:file.name,type:file.type,lastModified:file.lastModified,base64:await toBase64(file)})))});
 }
-export async function getRemote() {
-  const owner=accountId(),connection=await accountConnection(owner);const {data,error}=await cloudReadDeadline(()=>connection.from('teacher_records').select('*').maybeSingle());if(accountId()!==owner)throw new Error('Account changed');
-  if(error)throw error;return data;
-}
+export async function getRemote(){const owner=accountId(),data=await readCloudRecord(owner);if(accountId()!==owner)throw new Error('Account changed');return data}
 const hash = async file => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer())),x=>x.toString(16).padStart(2,'0')).join('');
 export async function pushSnapshot(userId,expected) {
   const connection=await accountConnection(userId);
@@ -88,3 +85,4 @@ export async function applySnapshot(data,revision) {
   const ids=new Set(data.papers.map(p=>p.id));
   await deletePapers((await listPapers(dbName)).map(([id])=>id).filter(id=>!ids.has(id)),dbName);
 }
+
