@@ -1,3 +1,4 @@
+import {canOpenCachedWorkspace,isConnectionFailure} from './cached-workspace.mjs';
 import {cloudReadDeadline} from './cloud-download-cache.mjs';
 import {clearProjectLogin} from './local-auth-reset.mjs';
 import React,{useEffect,useRef,useState} from 'react';
@@ -73,7 +74,7 @@ function AccountWorkspace({user,children}) {
             // Legacy records remain untouched and are never silently uploaded.
             const raw=localStorage.getItem('sa_classes');setLegacy(raw?JSON.parse(raw):[]);setStatus('Bağlantı hazır. Başlamak için aşağıdaki seçeneklerden birini seçin.');setPhase('setup');
           }
-        }catch(error){console.warn('Bulut açılışı tamamlanamadı',{code:String(error?.code||''),message:String(error?.message||'').slice(0,200)});setPhase('error');setStatus(friendly(error));}
+        }catch(error){console.warn('Bulut açılışı: '+String(error?.code||'')+' '+String(error?.message||'').slice(0,200));if(!s.stopped&&isConnectionFailure(error)&&await canOpenCachedWorkspace(user.id,{activeAccount:accountId,storage:localStorage,snapshot})){s.applying=false;s.ready=true;s.cachedFallback=true;setPhase('ready');setStatus('Buluta ulaşılamadı. Bu cihazdaki kayıtlar açıldı; eşitleme bağlantı gelince devam edecek.')}else{setPhase('error');setStatus(friendly(error));}}
         await held;
       });
     }catch(error){setPhase('error');setStatus(friendly(error));}};
@@ -130,4 +131,5 @@ function AccountWorkspace({user,children}) {
   if(phase==='loading')return <StartupSplash message={status}/>;
   return <>{phase==='ready'?<><div className="account-bar"><div className="account-summary"><strong>{user.email}</strong><span role="status">{visibleStatus}</span></div><details className="account-details"><summary>Hesabım ve eşitleme</summary><div className="account-details-body"><strong>Kişisel hesabım</strong><p>{user.email}</p><p>{visibleStatus}</p><p>Bilgisayarda ve telefonda aynı hesapla giriş yapın. Uygulama açıkken değişiklikler internet üzerinden otomatik eşitlenir. Diğer cihazda devam etmeden önce “Buluta kaydedildi” veya “Bulut kayıtları güncel” yazısını bekleyin.</p><p>Yedek dosyası almak veya eski kayıtları aktarmak için Ayarlar bölümünü kullanın.</p><button disabled={busy} onClick={signout}>Çıkış yap</button></div></details></div><div key={version}>{children}</div></>:<main className="account-screen"><section className="account-card"><h1>Kişisel çalışma alanı</h1><p>{user.email}</p>{phase==='loading'?<p>Bulut kayıtları açılıyor…</p>:phase==='locked'?<p>Bu hesap başka bir sekmede açık. Diğer sekmeyi kapatıp burayı yenileyin.</p>:phase==='setup'?<><h2>İlk eşitleme</h2><p>Bu hesapta henüz bulut kaydı yok. {legacy?.length||0} sınıf bu tarayıcının önceki kayıtlarında bulunuyor.</p><p>Aktar seçeneği sınıfları, öğrenci adlarını, sınavları, notları ve kâğıtları kendi Supabase projenizde hesabınıza özel alana gönderir. Önceki cihaz kayıtları korunur ve yedek dosyası hazırlanır.</p>{!!legacy?.length&&<button className="primary" disabled={busy} onClick={()=>initialize(true)}>Bu cihazdaki kayıtları hesabıma aktar</button>}<button className="secondary" disabled={busy} onClick={()=>initialize(false)}>Boş hesapla başla</button></>:<><p role="alert">{status}</p>{phase==='conflict'&&<><button className="primary" disabled={busy} onClick={backup}>Önce bu cihazın yedeğini indir</button><button className="secondary" disabled={busy||!backupDone} onClick={()=>{localStorage.removeItem(dirtyKey());window.location.reload()}}>Yedeği aldım, buluttaki sürümü aç</button></>}<button className="secondary" disabled={busy} onClick={()=>window.location.reload()}>Tekrar dene</button></>}{phase==='setup'&&<p role="status">{busy?'Kayıtlar hazırlanıyor…':status}</p>}<button className="secondary" disabled={busy} onClick={signout}>Çıkış yap</button></section></main>}</>;
 }
+
 
