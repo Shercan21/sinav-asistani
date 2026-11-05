@@ -1,0 +1,11 @@
+import React,{useRef,useState} from 'react';
+import {identityAreasOnPage} from './pdf-student-identity.mjs';
+import {moveArea} from './visual-assessment.mjs';
+const handles=[['nw','sol üst'],['n','üst'],['ne','sağ üst'],['e','sağ'],['se','sağ alt'],['s','alt'],['sw','sol alt'],['w','sol']];
+export default function IdentityPagePreview({image,page,regions,onChange,disabled=false,editable=false}){
+ const surface=useRef(null),gesture=useRef(null),[selected,setSelected]=useState('');
+ const rows=identityAreasOnPage(regions,page),update=(a,value)=>onChange({...regions,[a.field]:regions[a.field].map(r=>r.id===a.id?value:r)});
+ const point=e=>{const r=surface.current.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height}};
+ const down=e=>{if(disabled||!editable||e.button!==0)return;const box=e.target.closest('[data-identity-id]'),a=rows.find(r=>r.id===box?.dataset.identityId);if(!a)return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);setSelected(a.id);gesture.current={a,start:point(e),mode:e.target.dataset.handle||'move'}};
+ return <><div ref={surface} className={`batch-preview has-identity-areas${editable?' editing-identity':''}`} onPointerDown={down} onPointerMove={e=>{const g=gesture.current;if(!g)return;const p=point(e);update(g.a,moveArea(g.a,g.mode,p.x-g.start.x,p.y-g.start.y))}} onPointerUp={()=>{gesture.current=null}} onPointerCancel={()=>{gesture.current=null}}><img src={image} alt={`${page}. sayfa önizlemesi`} draggable="false"/>{rows.map(a=><div key={a.id} data-identity-id={a.id} className={`batch-identity-box${selected===a.id?' selected':''}`} style={{left:`${a.x*100}%`,top:`${a.y*100}%`,width:`${a.width*100}%`,height:`${a.height*100}%`}}><span>{a.label}</span>{editable&&selected===a.id&&handles.map(([mode,label])=><button key={mode} type="button" data-handle={mode} className={`area-handle handle-${mode}`} disabled={disabled} aria-label={`${a.label} ${label} tutamacı`} onKeyDown={e=>{const keys={ArrowLeft:[-.005,0],ArrowRight:[.005,0],ArrowUp:[0,-.005],ArrowDown:[0,.005]};if(keys[e.key]){e.preventDefault();const [dx,dy]=keys[e.key];update(a,moveArea(a,mode,dx,dy))}}}/>)}</div>)}</div>{editable&&<div className="tool-tabs">{rows.map(a=><button key={a.id} type="button" className="secondary" onClick={()=>setSelected(a.id)}>{a.label} kutusunu seç</button>)}</div>}</>;
+}
