@@ -13,7 +13,7 @@ export function parseRoster(text, existing = []) {
 }
 export function validateKey(key, count, type) {
   if (key.length !== count) return false;
-  return key.every(q => Number.isFinite(Number(q.max)) && Number(q.max) > 0 && Number(q.max) <= 100 && (type !== 'Test' || q.visual===true || /^[A-E]$/.test(q.answer))) && Math.abs(key.reduce((sum,q)=>sum+Number(q.max),0)-100)<0.001;
+  return key.every(q => Number.isFinite(Number(q.max)) && Number(q.max) > 0 && Number(q.max) <= 100 && (type !== 'Test' || q.visual===true || /^[A-E]$/.test(q.answer))) && (Math.abs(key.reduce((sum,q)=>sum+Number(q.max),0)-100)<0.001 || key.every(q=>q.visual===true)&&key.reduce((sum,q)=>sum+Number(q.max),0)<=100.001);
 }
 export function gradeExam(exam, values) {
   if (!validateKey(exam.key || [], exam.questions, exam.type) || values.length !== exam.questions) return null;

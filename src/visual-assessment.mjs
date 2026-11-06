@@ -21,7 +21,7 @@ export function validateAreaRows(rows,count,scored=false){
  const ids=new Set();for(const group of rows){if(!Array.isArray(group)||group.length>24)throw new Error('Bir soruda en fazla 24 alan olabilir.');for(const a of group){if(!validArea(a)||!idOK(a.id)||ids.has(a.id))throw new Error('Seçili alan geçersiz.');ids.add(a.id);if(a.answerAreaId!==undefined&&!idOK(a.answerAreaId))throw new Error('Öğrenci cevap alanı bağlantısı geçersiz.');if(scored&&(a.max!==''&&(typeof a.max!=='number'||!Number.isFinite(a.max)||a.max<0||a.max>100)))throw new Error('Alan puanı 0–100 arasında olmalı.')}}return rows;
 }
 export function rubricScores(rows){return rows.map(group=>roundScore(group.reduce((n,a)=>n+Number(a.max||0),0)))}
-export function validVisualRubric(regions){return regions.every(group=>group.length&&group.every(a=>typeof a.max==='number'&&a.max>0))&&Math.abs(rubricScores(regions).reduce((a,b)=>a+b,0)-100)<.001}
+export function validVisualRubric(regions){return regions.every(group=>group.length&&group.every(a=>typeof a.max==='number'&&a.max>0))&&rubricScores(regions).reduce((a,b)=>a+b,0)>0&&rubricScores(regions).reduce((a,b)=>a+b,0)<=100.001}
 export function validateVisualKey(key,count){
  if(!key||!idOK(key.id)||typeof key.name!=='string'||!key.name.trim()||key.name.length>200||!hashOK(key.paperFingerprint)||typeof key.paperId!=='string'||key.paperId.length>250||key.questions!==count)throw new Error('Görsel cevap anahtarı geçersiz.');
  validateAreaRows(key.regions,count,true);validateRubricLinks(key,count);return key;
