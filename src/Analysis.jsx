@@ -113,8 +113,8 @@ function ExamAnalysis({source, sources, onSaveMeta}) {
       </tbody></table></div>
         <p className="an-muted">{letters.length ? 'Yeşil: doğru şık. Kırmızı: en çok işaretlenen yanlış şık (çeldirici). ' : ''}Başarısı %40’ın altındaki sorular yeniden anlatılmaya adaydır.{source.kind === 'serial' && qs.some(q => !q.max) ? ' Seri taramada başarı yüzdesi için soru puanlarını girin.' : ''}</p>
       </section>
-      <section className="an-card"><h3>Not çizelgesi</h3><div className="table-scroll"><table><thead><tr><th>No</th><th>Ad soyad</th><th>Puan</th></tr></thead><tbody>
-        {order.map(r => <tr key={r.studentId}><td>{r.number}</td><td>{r.name}</td><td><strong>{fmt(r.total)}</strong></td></tr>)}
+      <section className="an-card"><h3>Öğrenci soru puanları</h3><p className="an-muted">Her öğrencinin sorulardan aldığı kayıtlı puanlar. Soru başlıklarında en yüksek puan gösterilir; — işareti kayıtlı soru puanı olmadığını belirtir.</p><div className="table-scroll"><table><thead><tr><th>No</th><th>Ad soyad</th>{source.questions.map(q => <th key={q.no}>{q.no}. soru{q.max != null && <small style={{display:'block'}}>/{fmt(q.max)}</small>}</th>)}<th>Toplam</th></tr></thead><tbody>
+        {order.map(r => <tr key={r.studentId}><td>{r.number}</td><td>{r.name}</td>{source.questions.map((q,i) => <td key={q.no}>{fmt(r.perQ[i]?.got)}</td>)}<td><strong>{fmt(r.total)}</strong></td></tr>)}
       </tbody></table></div></section>
       <button type="button" className="secondary no-print" onClick={() => window.print()}>Raporu yazdır / PDF</button>
     </>}
@@ -140,6 +140,7 @@ function StudentReport({student, classroom, sources}) {
       <section className="an-card"><h3>Girdiği sınavlar</h3><div className="table-scroll"><table><thead><tr><th>Tarih</th><th>Sınav</th><th>Tür</th><th>Puan</th><th>Sınıf ort.</th></tr></thead><tbody>
         {[...p.entries].reverse().map(e => <tr key={e.source.id}><td>{dateTR(e.date)}</td><td>{e.source.name}</td><td>{e.source.label}</td><td><strong>{fmt(e.total)}</strong></td><td>{fmt(summary(e.source).avg)}</td></tr>)}
       </tbody></table></div></section>
+      <section className="an-card"><h3>Soru soru aldığı puanlar</h3>{[...p.entries].reverse().map(e => {const row=e.source.rows.find(r=>r.studentId===student.id);return <div key={e.source.id}><h4>{e.source.name} · {dateTR(e.date)}</h4><div className="table-scroll"><table><thead><tr><th>Soru</th><th>Alınan puan</th><th>En yüksek puan</th></tr></thead><tbody>{e.source.questions.map((q,i)=><tr key={q.no}><td>{q.no}. soru</td><td>{fmt(row?.perQ[i]?.got)}</td><td>{fmt(q.max)}</td></tr>)}</tbody><tfoot><tr><th>Toplam</th><td><strong>{fmt(e.total)}</strong></td><td></td></tr></tfoot></table></div></div>})}</section>
       <button type="button" className="secondary no-print" onClick={() => window.print()}>Karneyi yazdır / PDF</button>
     </>}
   </div>;
