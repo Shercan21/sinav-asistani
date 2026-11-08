@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {savedPaperReviewStatus} from '../src/saved-class-reading.mjs';
+test('saved review status distinguishes machine reading, teacher confirmation, and changed drafts',()=>{
+ const row={id:'s',hash:'paper',hasReading:true};
+ const exam={questions:2,type:'Klasik',key:[{max:50},{max:50}],results:{},evaluations:{s:{paperFingerprint:'paper',manualScores:[0,40],marks:[],checked:[true,true]}}};
+ assert.equal(savedPaperReviewStatus(exam,row),'Okundu · kontrol bekliyor');
+ exam.results.s=[0,40];
+ assert.equal(savedPaperReviewStatus(exam,row),'Onaylandı · puanlar kaydedildi');
+ exam.evaluations.s.manualScores[1]=30;
+ assert.equal(savedPaperReviewStatus(exam,row),'Kayıtlı sonuç var · yeni çalışma kontrol bekliyor');
+ exam.evaluations.s.manualScores[1]=40;exam.evaluations.s.checked[0]=false;
+ assert.equal(savedPaperReviewStatus(exam,row),'Kayıtlı sonuç var · yeni çalışma kontrol bekliyor');
+ exam.evaluations.s.checked[0]=true;row.hash='new-paper';
+ assert.equal(savedPaperReviewStatus(exam,row),'Kayıtlı sonuç var · yeni çalışma kontrol bekliyor');
+ delete exam.evaluations.s;
+ assert.equal(savedPaperReviewStatus(exam,row),'Onaylandı · puanlar kaydedildi');
+ delete exam.results.s;row.hasReading=false;
+ assert.equal(savedPaperReviewStatus(exam,row),'Okunmayı bekliyor');
+});

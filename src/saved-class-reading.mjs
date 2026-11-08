@@ -1,4 +1,5 @@
-import {freshEvaluation,visualSignature} from './visual-assessment.mjs';
+import {gradeExam} from './exam-data.mjs';
+import {freshEvaluation,visualSignature,evaluationScores} from './visual-assessment.mjs';
 import {bulkReadingDraft} from './batch-pdf-reading.mjs';
 import {runPdfQueue} from './batch-pdf-data.mjs';
 export function hasCurrentSavedReading(draft,hash,signature,count){return draft?.paperFingerprint===hash&&draft.keySignature===signature&&draft.reading?.length===count&&draft.areas?.length===count&&draft.reading.every(r=>r.provider==='gemini'&&r.geminiAreas?.length)}
@@ -14,4 +15,16 @@ export async function readSavedClassPapers({items,exam,getCurrent,readPaper,fing
   const draft=freshEvaluation(row.hash,signature,original.questions),result=await read({paper,keyPaper,questions:original.questions,answerKey:original.key,visualRubric:original.visualRubric,targets:Array.from({length:original.questions},(_,i)=>i+1),areas:draft.areas,signal,onProgress});await check(row.id);
   const currentPaper=await readPaper(paperId),currentKey=await readPaper(keyId);await check(row.id);if(!currentPaper||await fingerprint(currentPaper)!==row.hash||!currentKey||await fingerprint(currentKey)!==keyHash)throw new Error('Okuma sırasında kâğıt değişti; öneri kaydedilmedi.');if(JSON.stringify(getCurrent().exam.evaluations?.[row.id]||null)!==before)throw new Error('Bu öğrencinin çalışması başka bir ekranda değişti; mevcut çalışma korundu.');await check(row.id);await save(row.id,bulkReadingDraft(draft,result));onDone?.(row);
  },{signal,pauseMs,onProgress:(i,n,row)=>onProgress?.(`${i+1}/${n} · ${row.number} ${row.name}: bütün sorular okunuyor…`)});
+}
+
+export function savedPaperReviewStatus(exam,row,completed=false){
+ const values=exam.results?.[row.id],draft=exam.evaluations?.[row.id];
+ const saved=Array.isArray(values)&&gradeExam(exam,values)!==null;
+ if(saved){
+  if(!draft)return 'Onaylandı · puanlar kaydedildi';
+  const scores=evaluationScores(draft);
+  if(draft.paperFingerprint===row.hash&&draft.checked?.length===exam.questions&&draft.checked.every(Boolean)&&scores.length===values.length&&scores.every((v,i)=>v!==''&&Number(v)===Number(values[i])))return 'Onaylandı · puanlar kaydedildi';
+  return 'Kayıtlı sonuç var · yeni çalışma kontrol bekliyor';
+ }
+ return completed||row.hasReading?'Okundu · kontrol bekliyor':'Okunmayı bekliyor';
 }
