@@ -1,0 +1,4 @@
+import React,{useSyncExternalStore} from 'react';
+import {READING_PROVIDERS,getReadingProvider,selectReadingProvider,subscribeReadingProvider} from './reading-providers.mjs';
+export function useReadingProvider(){return useSyncExternalStore(subscribeReadingProvider,getReadingProvider)}
+export default function ReadingProviderPicker({disabled,onChange}){const provider=useReadingProvider();return <label>Okuma servisi<select aria-label="Okuma servisi" value={provider} disabled={disabled} onChange={e=>{selectReadingProvider(e.target.value);onChange?.()}}>{Object.entries(READING_PROVIDERS).map(([id,p])=><option key={id} value={id}>{p.name}</option>)}</select><small>Seçilen servisin API kotası kullanılır. Kota dolarsa servis değiştirip kalanlarla devam edebilirsiniz. Sohbet aboneliği API anahtarı yerine geçmez.</small></label>}

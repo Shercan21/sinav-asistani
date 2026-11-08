@@ -1,3 +1,4 @@
+import {readingRequestAccess} from './reading-provider-server.mjs';
 import {createClient} from '@supabase/supabase-js';
 import {createServer} from 'node:http';
 import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
@@ -68,18 +69,19 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
       if(path==='/api/ocr/status'&&req.method==='GET')return send(200,{configured:Boolean(ownerAccess&&apiKey),provider:'Google Gemini',model:'gemini-2.5-flash'});
       if(['/api/ocr','/api/ocr/grade'].includes(path)&&req.method==='POST'){
         if(req.headers.origin!==allowed||!req.headers['content-type']?.startsWith('application/json'))return send(403,{error:'İstek doğrulanamadı.'});
-        const supplied=req.headers['x-gemini-api-key'];
-        if(supplied!==undefined&&(typeof supplied!=='string'||!/^AIza[A-Za-z0-9_-]{20,196}$/.test(supplied)))return send(400,{error:'Geçerli bir Gemini API anahtarı girin.'});
-        const requestKey=supplied||(ownerAccess?apiKey:'');
-        if(!requestKey)return send(403,{error:'Kendi Gemini API anahtarınızı girin.'});
+        let access;try{access=readingRequestAccess(req.headers,ownerAccess?apiKey:'')}catch(e){return send(400,{error:e.message})}
+        const {provider,apiKey:requestKey}=access;
+        if(provider!=='gemini'&&path!=='/api/ocr/grade')return send(400,{error:'Bu servis yalnız görsel soru değerlendirmesinde kullanılabilir.'});
+        if(!requestKey)return send(403,{error:'Seçtiğiniz servisin kendi API anahtarını girin.'});
         if(now()-readWindow>=3600000){reads=0;readWindow=now()}
         if(active||now()-lastRead<5000||reads>=20)return send(429,{error:'Okuma sınırına ulaşıldı veya başka okuma sürüyor. Daha sonra tekrar deneyin.'});
         active=true;lastRead=now();reads++;
         const abort=new AbortController(),closed=()=>abort.abort();res.once('close',closed);
         try{
           const input=JSON.parse(await body(15*1024*1024));
-          if(input.consent!==true)return send(400,{error:'Google Gemini’ye gönderim onayı gerekli.'});
-          const result=await (path==='/api/ocr/grade'?grader:reader)(input,{apiKey:requestKey,signal:abort.signal});return send(200,result);
+          if(input.consent!==true)return send(400,{error:'Seçili servise gönderim onayı gerekli.'});
+          if(provider!=='gemini'&&input.comparison!=='visual-rubric')return send(400,{error:'Bu servis yalnız görsel soru değerlendirmesinde kullanılabilir.'});
+          const result=await (path==='/api/ocr/grade'?grader:reader)(input,{apiKey:requestKey,signal:abort.signal,provider});return send(200,result);
         }catch(err){return send(400,{error:err.message==='BODY_LIMIT'?'Dosya çok büyük. En fazla 10 MB seçin.':err instanceof SyntaxError?'Dosya isteği okunamadı.':['AbortError','TimeoutError'].includes(err.name)?'Okuma iptal edildi veya zaman aşımına uğradı.':err.message?.startsWith('fetch')?'Okuma servisine ulaşılamadı.':err.message||'Okuma tamamlanamadı.'})}finally{res.removeListener('close',closed);active=false}
       }
       if(path.startsWith('/api/'))return send(405,{error:'Desteklenmeyen işlem.'});

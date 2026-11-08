@@ -1,3 +1,4 @@
+import {readingRequestAccess} from './reading-provider-server.mjs';
 import {proposeWithGemini} from './grading-server.mjs';
 import {readFile} from 'node:fs/promises';
 import {homedir} from 'node:os';
@@ -71,8 +72,9 @@ export function ocrPlugin(){
       for await(const chunk of req){size+=chunk.length;if(size>15*1024*1024){send(413,{error:'Otomatik okuma sınırı 10 MB.'});req.resume();return}chunks.push(chunk)}
       let input;try{input=JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{return send(400,{error:'Dosya isteği okunamadı.'})}
       if(input.consent!==true)return send(400,{error:'Google Gemini’ye gönderim onayı gerekli.'});
-      const supplied=req.headers['x-gemini-api-key'];if(supplied!==undefined&&(typeof supplied!=='string'||!/^AIza[A-Za-z0-9_-]{20,196}$/.test(supplied)))return send(400,{error:'Geçerli bir Gemini API anahtarı girin.'});
-      const abort=new AbortController();const onClose=()=>abort.abort();res.once('close',onClose);try{const result=await (path==='/api/ocr/grade'?proposeWithGemini:readWithGemini)(input,{apiKey:supplied||await getApiKey(),signal:abort.signal});send(200,result)}finally{res.removeListener('close',onClose)}
+      const {provider,apiKey}=readingRequestAccess(req.headers,await getApiKey());
+      if(provider!=='gemini'&&(path!=='/api/ocr/grade'||input.comparison!=='visual-rubric'))return send(400,{error:'Bu servis yalnız görsel soru değerlendirmesinde kullanılabilir.'});
+      const abort=new AbortController();const onClose=()=>abort.abort();res.once('close',onClose);try{const result=await (path==='/api/ocr/grade'?proposeWithGemini:readWithGemini)(input,{apiKey,signal:abort.signal,provider});send(200,result)}finally{res.removeListener('close',onClose)}
     }catch(err){const message=['TimeoutError','AbortError'].includes(err.name)?'Okuma zaman aşımına uğradı. Tekrar deneyin.':err.message;send(400,{error:message.startsWith('fetch')?'İnternet bağlantısını kontrol edin.':message})}finally{active=false}
   })}}
 }

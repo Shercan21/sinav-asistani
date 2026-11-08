@@ -18,5 +18,12 @@ test('grading route requires session, correct origin and explicit consent; share
     clock+=6000;const ownKey='AIza'+'a'.repeat(35);
     assert.equal((await request('/api/ocr/grade',{...opts,headers:{...opts.headers,'X-Gemini-Api-Key':ownKey},body:JSON.stringify({consent:true})})).status,200);assert.equal(receivedKey,ownKey);
     clock+=6000;assert.equal((await request('/api/ocr/grade',{...opts,headers:{...opts.headers,'X-Gemini-Api-Key':'bad'},body:JSON.stringify({consent:true})})).status,400);assert.equal(calls,2);
+    clock+=6000;
+    assert.equal((await request('/api/ocr/grade',{...opts,headers:{...opts.headers,'X-Reading-Provider':'openai'},body:JSON.stringify({consent:true,comparison:'visual-rubric'})})).status,403);assert.equal(calls,2);
+    const openaiKey='sk-'+ 'b'.repeat(40);
+    assert.equal((await request('/api/ocr/grade',{...opts,headers:{...opts.headers,'X-Reading-Provider':'openai','X-Reading-Api-Key':openaiKey},body:JSON.stringify({consent:true,comparison:'visual-rubric'})})).status,200);assert.equal(calls,3);assert.equal(receivedKey,openaiKey);
+    clock+=6000;
+    assert.equal((await request('/api/ocr/grade',{...opts,headers:{...opts.headers,'X-Reading-Provider':'claude','X-Reading-Api-Key':'sk-ant-'+ 'c'.repeat(40)},body:JSON.stringify({consent:true,comparison:'images'})})).status,400);assert.equal(calls,3);
+
   }finally{await new Promise(r=>server.close(r))}
 });

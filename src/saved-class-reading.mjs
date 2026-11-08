@@ -2,7 +2,7 @@ import {gradeExam} from './exam-data.mjs';
 import {freshEvaluation,visualSignature,evaluationScores} from './visual-assessment.mjs';
 import {bulkReadingDraft} from './batch-pdf-reading.mjs';
 import {runPdfQueue} from './batch-pdf-data.mjs';
-export function hasCurrentSavedReading(draft,hash,signature,count){return draft?.paperFingerprint===hash&&draft.keySignature===signature&&draft.reading?.length===count&&draft.areas?.length===count&&draft.reading.every(r=>r.provider==='gemini'&&r.geminiAreas?.length)}
+export function hasCurrentSavedReading(draft,hash,signature,count){return draft?.paperFingerprint===hash&&draft.keySignature===signature&&draft.reading?.length===count&&draft.areas?.length===count&&draft.reading.every(r=>['gemini','openai','claude'].includes(r.provider)&&r.geminiAreas?.length)}
 export async function discoverSavedClassPapers({exam,students,readPaper,fingerprint,guard=()=>{},signal}){
  const signature=await visualSignature(exam.key,exam.visualRubric),rows=[];
  for(const student of students){signal?.throwIfAborted();guard();const paper=await readPaper(`${exam.id}:${student.id}`);signal?.throwIfAborted();guard();if(!paper){rows.push({...student,available:false});continue}const hash=await fingerprint(paper);signal?.throwIfAborted();guard();rows.push({...student,available:true,hash,filename:paper.name,size:paper.size,hasReading:!!hasCurrentSavedReading(exam.evaluations?.[student.id],hash,signature,exam.questions)})}return rows;

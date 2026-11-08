@@ -1,3 +1,5 @@
+import {ensureReadingAccess,clearReadingKeys,forgetReadingKey} from './reading-access.mjs';
+import {getReadingProvider} from './reading-providers.mjs';
 import {readTeacherRecord} from './cloud-record-read.mjs';
 import {createSessionAccess} from './cloud-session.mjs';
 import {cloudReadDeadline} from './cloud-download-cache.mjs';
@@ -23,19 +25,28 @@ export async function accountConnection(userId) {
 let geminiAccount='';
 export async function prepareGeminiAccess(){
  const {data:{session}}=await cloud.auth.getSession();const id=session?.user.id||'local';
- if(id!==geminiAccount){clearGeminiKeys();geminiAccount=id}
+ if(id!==geminiAccount){clearGeminiKeys();clearReadingKeys();geminiAccount=id}
  const headers=session?{Authorization:`Bearer ${session.access_token}`} : {};
  const key=await ensureGeminiAccess(id,url=>fetch(url,{headers}));
  const {data:{session:current}}=await cloud.auth.getSession();
- if((current?.user.id||'local')!==id){clearGeminiKeys();throw new Error('Hesap değişti. Okumayı yeniden başlatın.')}
+ if((current?.user.id||'local')!==id){clearGeminiKeys();clearReadingKeys();throw new Error('Hesap değişti. Okumayı yeniden başlatın.')}
  return {key,id};
 }
-cloud.auth.onAuthStateChange((event,session)=>{rememberCloudSession(session);if(event==='SIGNED_OUT'){clearGeminiKeys();geminiAccount=''}});
+cloud.auth.onAuthStateChange((event,session)=>{rememberCloudSession(session);if(event==='SIGNED_OUT'){clearGeminiKeys();clearReadingKeys();geminiAccount=''}});
+export async function prepareReadingAccess(provider=getReadingProvider()){
+ if(provider==='gemini')return prepareGeminiAccess();
+ const {data:{session}}=await cloud.auth.getSession(),id=session?.user.id||'local';
+ if(id!==geminiAccount){clearGeminiKeys();clearReadingKeys();geminiAccount=id}
+ const key=await ensureReadingAccess(id,provider);
+ const {data:{session:current}}=await cloud.auth.getSession();
+ if((current?.user.id||'local')!==id){clearReadingKeys();throw new Error('Hesap değişti. Okumayı yeniden başlatın.')}
+ return {key,id};
+}
 export async function cloudFetch(url,options={}) {
- let access;if(options.method==='POST'&&['/api/ocr','/api/ocr/grade'].includes(url))access=await prepareGeminiAccess();
+ const {readingProvider='gemini',...requestOptions}=options;let access;if(options.method==='POST'&&['/api/ocr','/api/ocr/grade'].includes(url))access=await prepareReadingAccess(readingProvider);
  const {data:{session}} = await cloud.auth.getSession();
- const response=await fetch(url,{...options,headers:{...options.headers,...(session?{Authorization:`Bearer ${session.access_token}`} : {}),...(access?.key?{'X-Gemini-Api-Key':access.key}:{})}});
- if(access?.key&&response.status===400){const result=await response.clone().json().catch(()=>null);if(/anahtar|erişim/.test(result?.error||''))forgetGeminiKey(access.id)}
+ const response=await fetch(url,{...requestOptions,headers:{...options.headers,...(session?{Authorization:`Bearer ${session.access_token}`} : {}),...(url==='/api/ocr/grade'?{'X-Reading-Provider':readingProvider}:{}),...(access?.key?{[readingProvider==='gemini'?'X-Gemini-Api-Key':'X-Reading-Api-Key']:access.key}:{})}});
+ if(access?.key&&[400,401,403].includes(response.status)){const result=await response.clone().json().catch(()=>null);if(/anahtar|erişim/.test(result?.error||'')){if(readingProvider==='gemini')forgetGeminiKey(access.id);else forgetReadingKey(access.id,readingProvider)}}
  return response;
 }
 
