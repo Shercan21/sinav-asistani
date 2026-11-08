@@ -28,7 +28,7 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
     const body=async limit=>{let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>limit)throw new Error('BODY_LIMIT');chunks.push(chunk)}return Buffer.concat(chunks).toString('utf8')};
     try{
       const path=new URL(req.url,'http://server').pathname;
-      if(path==='/healthz'&&req.method==='GET')return send(200,{ok:true});
+      if(path==='/healthz'&&req.method==='GET')return send(200,{ok:true,revision:process.env.RENDER_GIT_COMMIT||'local'});
       if(personalAuth&&path==='/login'){res.writeHead(303,{Location:'/'});return res.end();}
       if(path==='/login'&&req.method==='GET'){
         const payload=`${now()+900000}.${randomBytes(16).toString('hex')}`,token=`${payload}.${sign(payload)}`;
@@ -50,7 +50,7 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         loginAttempts=0;
         const sessionToken=`${now()+43200000}.${randomBytes(16).toString('hex')}`;
         res.setHeader('Set-Cookie',cookie(`${sessionToken}.${sign(sessionToken)}`));
-        if(req.headers['x-login-request']==='1')return send(200,{ok:true});
+        if(req.headers['x-login-request']==='1')return send(200,{ok:true,revision:process.env.RENDER_GIT_COMMIT||'local'});
         res.writeHead(303,{Location:'/'});return res.end();
       }
       if(!personalAuth&&!validSession(req)){

@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {gradeVisualRubric} from '../gemini-visual-server.mjs';
-import {readingRequestAccess} from '../reading-provider-server.mjs';
+import {readingRequestAccess,providerErrorMessage} from '../reading-provider-server.mjs';
 import {freshEvaluation,validateEvaluation} from '../src/visual-assessment.mjs';
 import {bulkReadingDraft} from '../src/batch-pdf-reading.mjs';
 import {hasCurrentSavedReading} from '../src/saved-class-reading.mjs';
@@ -38,3 +38,13 @@ for(const provider of ['openai','claude']){
   assert.equal(applyCriterionScores(draft,0,draft.reading[0].geminiAreas).reading[0].provider,provider);
  });
 }
+
+test('provider errors distinguish credentials, billing, model, file and request failures without leaking upstream message',()=>{
+ const secret='sk-proj-private-secret';
+ assert.match(providerErrorMessage('openai',401,{code:'invalid_api_key',message:secret}),/anahtarı kabul edilmedi/);
+ assert.match(providerErrorMessage('openai',429,{code:'insufficient_quota'}),/bakiyesi/);
+ assert.match(providerErrorMessage('openai',404,{code:'model_not_found'}),/modeli bu API hesabında/);
+ assert.match(providerErrorMessage('openai',400,{code:'invalid_value',param:'input[0].content[1].file_data',message:'invalid PDF'}),/PDF veya görüntüyü/);
+ const text=providerErrorMessage('openai',400,{code:'invalid_request_error',message:secret,param:secret});
+ assert.match(text,/HTTP 400/);assert.equal(text.includes(secret),false);
+});
