@@ -1,3 +1,4 @@
+import {validateInstructions} from './reading-instructions.mjs';
 import {validArea} from './assessment-data.mjs';
 import {validateMarks} from './paper-marks.mjs';
 import {validateRubricLinks} from './rubric-links.mjs';
@@ -24,7 +25,7 @@ export function rubricScores(rows){return rows.map(group=>roundScore(group.reduc
 export function validVisualRubric(regions){return regions.every(group=>group.length&&group.every(a=>typeof a.max==='number'&&a.max>0))&&rubricScores(regions).reduce((a,b)=>a+b,0)>0&&rubricScores(regions).reduce((a,b)=>a+b,0)<=100.001}
 export function validateVisualKey(key,count){
  if(!key||!idOK(key.id)||typeof key.name!=='string'||!key.name.trim()||key.name.length>200||!hashOK(key.paperFingerprint)||typeof key.paperId!=='string'||key.paperId.length>250||key.questions!==count)throw new Error('Görsel cevap anahtarı geçersiz.');
- validateAreaRows(key.regions,count,true);validateRubricLinks(key,count);return key;
+ validateInstructions(key.instructions,count);validateAreaRows(key.regions,count,true);validateRubricLinks(key,count);return key;
 }
 export function validateEvaluation(value,count){
  if(!value||value.version!==1||!hashOK(value.paperFingerprint)||!hashOK(value.keySignature)||!Array.isArray(value.checked)||value.checked.length!==count||value.checked.some(v=>typeof v!=='boolean')||!Array.isArray(value.manualScores)||value.manualScores.length!==count||value.manualScores.some(v=>v!==''&&(typeof v!=='number'||!Number.isFinite(v)||v<0||v>100)))throw new Error('Değerlendirme taslağı geçersiz.');

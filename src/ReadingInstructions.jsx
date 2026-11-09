@@ -1,0 +1,16 @@
+import React,{useState} from 'react';
+import {INSTRUCTION_RULES,emptyInstructions,copyInstructions} from './reading-instructions.mjs';
+import QuestionAlternatives from './QuestionAlternatives.jsx';
+export default function ReadingInstructions({draft,question,books,disabled,onChange,criteria,paper,onCriteriaChange}){
+ const [source,setSource]=useState('');const value=draft.instructions||emptyInstructions(draft.questions),specific=value.questions[question];
+ const updateQuestion=next=>onChange({...value,questions:value.questions.map((q,i)=>i===question?next:q)});
+ const toggle=(ids,id,checked)=>checked?[...ids,id]:ids.filter(x=>x!==id);
+ const choices=(ids,onToggle)=>Object.entries(INSTRUCTION_RULES).map(([id,rule])=><label key={id} className="rubric-zone-choice"><input type="checkbox" disabled={disabled} checked={ids.includes(id)} onChange={e=>onToggle(toggle(ids,id,e.target.checked))}/>{rule.label}</label>);
+ const sources=books.filter(b=>b.instructions&&b.id!==draft.id);
+ return <section aria-label="Okuma yönergeleri"><h3>Okuma yönergeleri</h3><p>Hazır kuralları seçebilir, açıklamalarınızı değiştirebilirsiniz. Bu yönergeler bu cevap anahtarıyla kaydedilir; puanlar tanımladığınız rubrikten alınır.</p>
+ {sources.length>0&&<details><summary>Kayıtlı başka anahtardan yönerge al</summary><label>Yönerge kaynağı<select disabled={disabled} value={source} onChange={e=>setSource(e.target.value)}><option value="">Anahtar seçin</option>{sources.map(b=><option key={b.owner+':'+b.id} value={b.owner+':'+b.id}>{b.name} · {b.questions} soru</option>)}</select></label><button type="button" className="secondary" disabled={disabled||!source} onClick={()=>{const entry=sources.find(b=>b.owner+':'+b.id===source);if(entry)onChange(copyInstructions(entry.instructions,draft.questions))}}>Yalnız yönergeleri kopyala</button><p>Alanlar, alternatif cevaplar ve puanlar korunur. Soru sayısı farklıysa yalnız genel kurallar ve sınav açıklaması alınır. Kopyalanan açıklamaların yeni sınava uygunluğunu kontrol edin.</p></details>}
+ <details open><summary>Bütün sınav için genel kurallar</summary>{choices(value.rules,rules=>onChange({...value,rules}))}<label>Sınava özel açıklama<textarea aria-label="Sınava özel okuma yönergesi" rows={4} maxLength={4000} disabled={disabled} value={value.examNote} placeholder="Bu sınavın tüm soruları için ek açıklamalarınız" onChange={e=>onChange({...value,examNote:e.target.value})}/></label></details>
+ <h3>{question+1}. sorunun yönergesi</h3><p>Bu soruya özgü seçenekler genel kurallara eklenir.</p>{choices(specific.rules,rules=>updateQuestion({...specific,rules}))}<label>Soruya özel açıklama<textarea aria-label={`${question+1}. soru okuma yönergesi`} rows={4} maxLength={2000} disabled={disabled} value={specific.note} placeholder="Örn. a ve b cevaplarını ayrı kontrol et; işlem devamı sağ kenarda olabilir." onChange={e=>updateQuestion({...specific,note:e.target.value})}/></label>
+ <QuestionAlternatives key={`${draft.id}:${question}:instructions`} question={question+1} criteria={criteria} paper={paper} disabled={disabled} onChange={onCriteriaChange}/>
+ <p>Değişiklikler taslak olarak saklanır. Okumada uygulanması için Cevap anahtarını kaydet düğmesine basın.</p></section>;
+}

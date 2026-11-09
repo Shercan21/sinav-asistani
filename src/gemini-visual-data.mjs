@@ -1,7 +1,9 @@
+import {validateInstructions} from './reading-instructions.mjs';
 import {validateCriterionAlternatives} from './criterion-alternatives.mjs';
 import {validArea} from './assessment-data.mjs';
 export function validateGeminiVisual(input){
  if(!input||input.comparison!=='visual-rubric'||input.consent!==true||!Number.isInteger(input.questions)||input.questions<1||input.questions>200||!Array.isArray(input.maxima)||input.maxima.length!==input.questions||input.maxima.some(n=>!Number.isFinite(n)||n<=0||n>100)||input.maxima.reduce((a,b)=>a+b,0)>100.001)throw new Error('Soru puanlarını kontrol edin.');
+ validateInstructions(input.instructions,input.questions);
  if(!Array.isArray(input.targets)||!input.targets.length||input.targets.length>input.questions||new Set(input.targets).size!==input.targets.length||input.targets.some(q=>!Number.isInteger(q)||q<1||q>input.questions))throw new Error('Okunacak sorular geçersiz.');
  if(!Array.isArray(input.rubric)||input.rubric.length!==input.targets.length)throw new Error('Kayıtlı görsel cevap anahtarı gerekli.');
  for(const q of input.targets){const group=input.rubric.filter(r=>r.question===q);if(group.length!==1||!Array.isArray(group[0].regions)||!group[0].regions.length||group[0].regions.length>24||group[0].regions.some(a=>!validArea(a)||!Number.isFinite(a.max)||a.max<=0||a.max>100)||Math.abs(group[0].regions.reduce((n,a)=>n+a.max,0)-input.maxima[q-1])>.001)throw new Error(`${q}. sorunun cevap anahtarı alanlarını ve puanlarını kontrol edin.`)}
