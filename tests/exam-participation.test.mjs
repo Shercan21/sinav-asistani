@@ -1,3 +1,4 @@
+import {participationButtonSvg} from '../src/participation-buttons.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {participationRows,participationExportIssues,validateParticipation} from '../src/exam-participation.mjs';
 import {buildEokulWorkbook} from '../src/eokul-excel.mjs';
@@ -28,4 +29,11 @@ test('Excel uses the e-Okul column order, text numbers, saved decimals, zero for
  assert.equal(s.getCell('A2').value,'0012');assert.equal(s.getCell('D2').value,17.5);assert.deepEqual(s.getCell('F2').value,{formula:'SUM(D2:E2)',result:77.5});assert.ok((await book.xlsx.writeBuffer()).byteLength>1000);assert.equal(s.getCell('C3').value,'Girmedi');assert.equal(s.getCell('D3').value,0);
  const exempt=await buildEokulWorkbook({...exam,participation:{a:'Muaf'}},participationRows({...exam,participation:{a:'Muaf'}},students,new Set(['e:a'])));assert.equal(exempt.getWorksheet(1).getCell('D2').value,null);assert.equal(exempt.getWorksheet(1).getCell('F2').value,null);
  await assert.rejects(buildEokulWorkbook(exam,participationRows(exam,students,new Set(['e:a','e:b']))),/henüz kaydedilmemiş/);
+});
+
+test('export embeds four side-by-side status buttons for every student and keeps the selected status as cell data',async()=>{
+ const exam=fixture(),rows=participationRows(exam,students,new Set(['e:a'])),requested=[];
+ const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZQAAAABJRU5ErkJggg==';
+ const book=await buildEokulWorkbook(exam,rows,{renderButtons:async status=>{requested.push(status);const svg=participationButtonSvg(status);for(const label of ['Girdi','Girmedi','Muaf','Kopya'])assert.ok(svg.includes('>'+label+'</text>'));assert.equal((svg.match(/font-weight="700"/g)||[]).length,1);return png;}});
+ assert.deepEqual(requested,['Girdi','Girmedi']);assert.equal(book.getWorksheet(1).getImages().length,2);assert.equal(book.getWorksheet(1).getCell('C2').value,'Girdi');assert.ok((await book.xlsx.writeBuffer()).byteLength>1000);
 });
