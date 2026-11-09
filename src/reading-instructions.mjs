@@ -1,3 +1,5 @@
+import {validArea} from './assessment-data.mjs';
+import {validateExplanation} from './key-explanations.mjs';
 export const INSTRUCTION_RULES={
  shared:{label:'Soru metnini ve basılı örnekleri öğrenci cevabından ayır',text:'Basılı örnekleri ve bütün kâğıtlarda ortak olan el yazılı soru görsellerini öğrenci cevabı olarak puanlama.'},
  overflow:{label:'Kenara ve alta taşan cevap devamlarını kontrol et',text:'Tam sayfayı yer bulmak için incele. Aynı soruya açık etiket veya okla bağlanan devamları dikkate al; bağlı cevap alanı yetersizse belirt. Başka sorudan cevap taşıma.'},
@@ -14,10 +16,11 @@ export function validateInstructions(value,count){
  if(value===undefined)return;
  const rules=v=>Array.isArray(v)&&v.length<=Object.keys(INSTRUCTION_RULES).length&&new Set(v).size===v.length&&v.every(x=>Object.hasOwn(INSTRUCTION_RULES,x));
  if(!value||value.version!==1||!rules(value.rules)||typeof value.examNote!=='string'||value.examNote.length>4000||!Array.isArray(value.questions)||value.questions.length!==count||value.questions.some(q=>!q||!rules(q.rules)||typeof q.note!=='string'||q.note.length>2000))throw new Error('Okuma yönergelerini kontrol edin. Sınav açıklaması en fazla 4000, soru açıklaması en fazla 2000 karakter olabilir.');
+ if(value.explanationsRequired!==undefined&&typeof value.explanationsRequired!=='boolean')throw Error('Cevap açıklaması ayarı geçersiz.');for(const q of value.questions){validateExplanation(q.explanation);if(q.explanationArea!==undefined&&!validArea(q.explanationArea))throw Error('Cevap açıklaması alanı geçersiz.');}
  return value;
 }
 export function copyInstructions(value,count){if(!value)return emptyInstructions(count);validateInstructions(value,value.questions.length);return {...structuredClone(value),questions:Array.from({length:count},(_,i)=>value.questions.length===count?structuredClone(value.questions[i]):{rules:[],note:''})}}
 export function instructionContext(value,count,targets){
  validateInstructions(value,count);const v=value||emptyInstructions(count),expand=ids=>ids.map(id=>({id,rule:INSTRUCTION_RULES[id].text}));
- return {generalRules:expand(v.rules),examNote:v.examNote,questions:targets.map(q=>({question:q,rules:expand(v.questions[q-1].rules),note:v.questions[q-1].note}))};
+ return {generalRules:expand(v.rules),examNote:v.examNote,questions:targets.map(q=>({question:q,rules:expand(v.questions[q-1].rules),note:v.questions[q-1].note,answerExplanation:v.questions[q-1].explanation||null}))};
 }

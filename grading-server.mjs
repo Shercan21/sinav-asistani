@@ -1,7 +1,9 @@
+import {extractKeyExplanations} from './key-explanations-server.mjs';
 import {gradeVisualRubric} from './gemini-visual-server.mjs';
 import {compareImagesWithGemini} from './image-grading-server.mjs';
 import {validateGradeInput,normalizeProposal} from './src/grade-proposal.mjs';
 export async function proposeWithGemini(raw,{apiKey,fetcher=fetch,signal,provider='gemini'}={}){
+  if(raw?.comparison==='key-explanations')return extractKeyExplanations(raw,{apiKey,fetcher,signal,provider});
   if(raw?.comparison==='visual-rubric')return gradeVisualRubric(raw,{apiKey,fetcher,signal,provider});
   if(raw?.comparison==='images')return compareImagesWithGemini(raw,{apiKey,fetcher,signal});
   const input=validateGradeInput(raw);

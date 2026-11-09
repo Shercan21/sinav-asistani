@@ -80,7 +80,7 @@ export function createApp({password,apiKey,origin,dist=resolve('dist'),secure=tr
         try{
           const input=JSON.parse(await body(15*1024*1024));
           if(input.consent!==true)return send(400,{error:'Seçili servise gönderim onayı gerekli.'});
-          if(provider!=='gemini'&&input.comparison!=='visual-rubric')return send(400,{error:'Bu servis yalnız görsel soru değerlendirmesinde kullanılabilir.'});
+          if(provider!=='gemini'&&!['visual-rubric','key-explanations'].includes(input.comparison))return send(400,{error:'Bu servis yalnız görsel soru değerlendirmesinde kullanılabilir.'});
           const result=await (path==='/api/ocr/grade'?grader:reader)(input,{apiKey:requestKey,signal:abort.signal,provider});return send(200,result);
         }catch(err){return send(400,{error:err.message==='BODY_LIMIT'?'Dosya çok büyük. En fazla 10 MB seçin.':err instanceof SyntaxError?'Dosya isteği okunamadı.':['AbortError','TimeoutError'].includes(err.name)?'Okuma iptal edildi veya zaman aşımına uğradı.':err.message?.startsWith('fetch')?'Okuma servisine ulaşılamadı.':err.message||'Okuma tamamlanamadı.'})}finally{res.removeListener('close',closed);active=false}
       }
