@@ -11,6 +11,7 @@ test('extracts only explicit explanation text from key, distinguishes absent/unr
   const body=JSON.parse(options.body),wire=JSON.stringify(body);assert.equal(wire.includes('STUDENT NEVER SENT'),false);assert.match(wire,/Örnek Öğrenci Cevabı/);assert.match(wire,/açıklama üretme/);assert.equal(body.contents[0].parts.filter(p=>p.inlineData).length,1);
   return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(result)}]}}]})};
  }});
+ assert.deepEqual(normalizeExplanations(data,3,[1,2,3]),data.explanations);
  const instructions=emptyInstructions(3);instructions.questions.forEach((q,i)=>q.explanation=data.explanations[i].explanation);
  assert.deepEqual(missingExplanations(instructions,[1,2,3]),[2,3]);assert.throws(()=>requireExplanations(instructions,[2]),/öğretmen/);assert.doesNotThrow(()=>requireExplanations(instructions,[1]));
  instructions.questions[1].explanation={source:'teacher',text:'Öğretmenin kabul koşulları.'};validateInstructions(instructions,3);requireExplanations(instructions,[1,2]);
