@@ -24,7 +24,7 @@ export function cloneRubricSelections(key,makeId=()=>crypto.randomUUID()){
 export function criterionStudentAreas(criterion,areas){const ids=criterion.answerAreaIds||[],matches=areas.filter(a=>ids.includes(a.answerAreaId));return matches.length?matches:areas}
 export function criterionRowsForScore(draft,index,score){
  const r=draft.reading?.[index],rows=r?.geminiAreas;if(!rows?.length||r.geminiContext!==JSON.stringify({areas:draft.areas[index],key:draft.keySignature,tone:draft.imageTones?.[index]||'original'})||(draft.marks||[]).some(m=>m.question===index+1&&typeof m.score==='number'))return [];
- const known=rows.filter(a=>a.score!=='');return known.length?score!==''&&Number.isFinite(score)&&Math.abs(known.reduce((n,a)=>n+a.score,0)-Number(score))<.001?rows:[]:score===''?rows:[];
+ const known=rows.filter(a=>a.score!=='');if(score===''&&known.length<rows.length)return rows;return known.length?score!==''&&Number.isFinite(score)&&Math.abs(known.reduce((n,a)=>n+a.score,0)-Number(score))<.001?rows:[]:score===''?rows:[];
 }
 export function criteriaForPiece(rows,area,index,areas){return rows.filter(r=>{const matches=areas.filter(a=>(r.answerAreaIds||[]).includes(a.answerAreaId));return matches.length?matches[0].id===area.id:index===0})}
 
