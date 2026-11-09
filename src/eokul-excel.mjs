@@ -1,0 +1,12 @@
+import {participationExportIssues} from './exam-participation.mjs';
+export async function buildEokulWorkbook(exam,rows){
+ const issues=participationExportIssues(exam,rows);if(issues.length)throw Error(issues.join(' '));
+ const Excel=await import('exceljs'),Workbook=Excel.Workbook||Excel.default?.Workbook,book=new Workbook();book.creator='Sınav Asistanı';book.calcProperties.fullCalcOnLoad=true;
+ const s=book.addWorksheet('e-Okul',{views:[{state:'frozen',xSplit:2,ySplit:1}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+ s.columns=[{header:'Okul No',width:14},{header:'Öğrenci Adı Soyadı',width:32},{header:'Katılım Durumu',width:20},...exam.key.map((q,i)=>({header:`${i+1}. (${q.max})`,width:12})),{header:`Toplam (${exam.key.reduce((n,q)=>n+Number(q.max),0)})`,width:16}];
+ const col=n=>{let v='';while(n){n--;v=String.fromCharCode(65+n%26)+v;n=Math.floor(n/26)}return v;};
+ for(const source of rows){const r=s.addRow([String(source.number),String(source.name),source.status,...source.scores,null]);r.height=27;r.getCell(1).numFmt='@';r.getCell(1).font={color:{argb:'FF7C3AED'}};const last=r.getCell(exam.questions+4);last.value=source.total===null?null:{formula:`SUM(D${r.number}:${col(exam.questions+3)}${r.number})`,result:source.total};last.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF1F5F9'}};last.font={bold:true};r.getCell(3).fill={type:'pattern',pattern:'solid',fgColor:{argb:{Girdi:'FFDCFCE7',Girmedi:'FFDBEAFE',Muaf:'FFFEF3C7',Kopya:'FFFEE2E2'}[source.status]}};r.eachCell(c=>{c.alignment={vertical:'middle',horizontal:c.col===2?'left':'center'};});}
+ s.getRow(1).height=32;s.getRow(1).eachCell(c=>{c.font={name:'Arial',bold:true,color:{argb:'FF1D4ED8'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF1F5F9'}};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};});s.autoFilter={from:{row:1,column:1},to:{row:s.rowCount,column:s.columnCount}};
+ return book;
+}
+export async function downloadEokulExcel(exam,rows,guard=()=>{}){guard();const book=await buildEokulWorkbook(exam,rows),data=await book.xlsx.writeBuffer();guard();const url=URL.createObjectURL(new Blob([data],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');a.href=url;a.download=`${exam.className}-${exam.name}-e-Okul`.replace(/[\\/:*?"<>|]/g,'-')+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}

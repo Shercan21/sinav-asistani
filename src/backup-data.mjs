@@ -1,3 +1,4 @@
+import {validateParticipation} from './exam-participation.mjs';
 import {linkedRubricReady} from './rubric-links.mjs';
 import {validateVisualKey,validateEvaluation,validVisualRubric} from './visual-assessment.mjs';
 import {validateWorkflow} from './assessment-data.mjs';
@@ -22,7 +23,7 @@ export function validateBackup(data) {
   for(const exam of data.exams){
     const classroom=data.classes.find(c=>c.name===exam.className);
     if(!idOK(exam.id)||examIds.has(exam.id)||!textOK(exam.name)||!textOK(exam.subject)||!classroom||!['Test','Klasik','Karma'].includes(exam.type)||!Number.isInteger(exam.questions)||exam.questions<1||exam.questions>200)fail();
-    examIds.add(exam.id);
+    examIds.add(exam.id);validateParticipation(exam.participation,classroom.students||[]);
     if(!validAnalysisMeta(exam.analysis,exam.questions))fail();
     if(exam.key!==undefined&&(!Array.isArray(exam.key)||!validateKey(exam.key,exam.questions,exam.type)))fail();
     if(exam.visualKeys!==undefined){if(!Array.isArray(exam.visualKeys)||exam.visualKeys.length>200)fail();const ids=new Set();for(const key of exam.visualKeys){validateVisualKey(key,exam.questions);if(ids.has(key.id)||!key.paperId.startsWith(exam.id+':'))fail();ids.add(key.id)}}
