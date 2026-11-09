@@ -1,3 +1,4 @@
+import {withStudentEvidence} from './evidence-fixture.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {emptyInstructions,validateInstructions,copyInstructions,instructionContext} from '../src/reading-instructions.mjs';
 import {cloneRubricSelections} from '../src/rubric-links.mjs';
@@ -26,5 +27,5 @@ test('backup roundtrip retains guidance and alternatives without changing saved 
 });
 test('selected guidance and alternatives reach the grading request together',async()=>{
  const image={mimeType:'application/pdf',base64:Buffer.from('%PDF-1.4 test').toString('base64')},input={comparison:'visual-rubric',consent:true,questions:1,maxima:[100],targets:[1],rubric:[{question:1,answerAreas:[area],regions:[criterion]}],studentImage:image,keyImage:image,instructions};let calls=0;
- const result=await gradeVisualRubric(input,{apiKey:'mock',fetcher:async(_url,options)=>{calls++;const body=JSON.parse(options.body),context=JSON.parse(body.contents[0].parts.find(p=>p.text?.startsWith('{')).text);assert.equal(context.teacherGuidance.examNote,instructions.examNote);assert.equal(context.teacherGuidance.questions[0].note,instructions.questions[0].note);assert.deepEqual(context.rubric[0].criteria[0].acceptableAlternatives,criterion.alternatives);return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({answers:[{question:1,regions:[{region:1,score:70,unclear:false,reason:'Mock'}],studentAreas:[]}]})}]}}]})}}});assert.equal(calls,1);assert.equal(result.answers[0].regions[0].score,70);
+ const result=await gradeVisualRubric(input,{apiKey:'mock',fetcher:withStudentEvidence(async(_url,options)=>{calls++;const body=JSON.parse(options.body),context=JSON.parse(body.contents[0].parts.find(p=>p.text?.startsWith('{')).text);assert.equal(context.teacherGuidance.examNote,instructions.examNote);assert.equal(context.teacherGuidance.questions[0].note,instructions.questions[0].note);assert.deepEqual(context.rubric[0].criteria[0].acceptableAlternatives,criterion.alternatives);return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({answers:[{question:1,regions:[{region:1,score:70,unclear:false,reason:'Mock'}],studentAreas:[]}]})}]}}]})}})});assert.equal(calls,1);assert.equal(result.answers[0].regions[0].score,70);
 });

@@ -1,3 +1,4 @@
+import {withStudentEvidence} from './evidence-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {upgradeRubricKey,cloneRubricSelections,linkedRubricReady,criterionStudentAreas,criterionRowsForScore} from '../src/rubric-links.mjs';
@@ -24,7 +25,7 @@ test('library clone remaps search, criterion and identity IDs without losing mul
 });
 test('Gemini validates linked criteria and returns one student region for multiple criteria; unmapped falls back safely',async()=>{
  const i=input();assert.ok(validateGeminiVisual(i));let calls=0;
- const result=await gradeVisualRubric(i,{apiKey:'test',fetcher:async(url,options)=>{calls++;const body=JSON.parse(options.body);assert.match(JSON.stringify(body),/ölçüt sayısı ile öğrenci alanı sayısının eşit olması gerekmez/);return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(output())}]}}]})}}});
+ const result=await gradeVisualRubric(i,{apiKey:'test',fetcher:withStudentEvidence(async(url,options)=>{calls++;const body=JSON.parse(options.body);assert.match(JSON.stringify(body),/ölçüt sayısı ile öğrenci alanı sayısının eşit olması gerekmez/);return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(output())}]}}]})}})});
  assert.equal(calls,1);assert.equal(result.answers[0].studentAreas.length,1);assert.deepEqual(result.answers[0].regions.map(a=>a.answerAreaIds),[['search'],['search'],['search']]);
  const a=result.answers[0].studentAreas;assert.deepEqual(criterionStudentAreas(result.answers[0].regions[2],a),a);assert.deepEqual(criterionStudentAreas({answerAreaIds:['unknown']},a),a);
  const bad=output();bad.answers[0].studentAreas[0].answerAreaId='foreign';assert.throws(()=>normalizeGeminiVisual(bad,i));i.rubric[0].regions[0].answerAreaIds=['foreign'];assert.throws(()=>validateGeminiVisual(i));
