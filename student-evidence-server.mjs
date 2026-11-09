@@ -30,6 +30,7 @@ export async function extractStudentEvidence(input,{apiKey,provider,fetcher,sign
 export function groundVisualScores(data,observations){
  const normalized=s=>s.normalize('NFKC').replace(/\s+/g,' ').trim();
  return {...data,answers:data.answers?.map(a=>({...a,regions:a.regions?.map(r=>{
+  if(r.guidanceConflict!==false)return {...r,score:null,unclear:true,reason:r.guidanceConflict===true?`Cevap açıklaması / yönerge ile puan ölçütü çelişiyor. Öğretmen kontrolü gerekli. ${r.reason||''}`.slice(0,600):'Cevap açıklaması, yönerge ve ölçüt uyumu doğrulanmadı; öğretmen kontrolü gerekli.'};
   const o=observations.find(o=>o.id===r.evidenceId&&o.question===a.question);
   const quote=typeof r.studentQuote==='string'?r.studentQuote.trim():'';
   if(o?.verified===false)return {...r,score:null,unclear:true,reason:o.verificationReason};

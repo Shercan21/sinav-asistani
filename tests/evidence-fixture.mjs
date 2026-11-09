@@ -14,7 +14,7 @@ export function withStudentEvidence(fetcher){
   return {...response,json:async()=>{
    const result=await response.json();
    const blocks=result.candidates?.[0]?.content?.parts||result.output?.[0]?.content||result.content||[];
-   for(const b of blocks)if(b.text){const data=JSON.parse(b.text);for(const a of data.answers||[])for(const r of a.regions||[]){r.evidenceId=`e-${a.question}`;r.studentQuote='Test öğrenci cevabı.';}b.text=JSON.stringify(data);}
+   for(const b of blocks)if(b.text){const data=JSON.parse(b.text);for(const a of data.answers||[])for(const r of a.regions||[]){r.guidanceConflict??=false;r.evidenceId=`e-${a.question}`;r.studentQuote='Test öğrenci cevabı.';}b.text=JSON.stringify(data);}
    return result;
   }};
  };

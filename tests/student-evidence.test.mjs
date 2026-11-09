@@ -21,12 +21,12 @@ test('extracts student evidence without key, model paper, rubric alternatives or
    return response({observations:[observation]});
   }
   assert.match(JSON.stringify(body),/studentEvidence/);
-  return response({answers:[{question:1,regions:[{region:1,score:10,reason:'3,4 N_A akb doğru.',unclear:false,evidenceId:'q1-a',studentQuote:'3,4 N_A akb'}],studentAreas:[area]}]});
+  return response({answers:[{question:1,regions:[{region:1,score:10,reason:'3,4 N_A akb doğru.',unclear:false,guidanceConflict:false,evidenceId:'q1-a',studentQuote:'3,4 N_A akb'}],studentAreas:[area]}]});
  }});
  assert.equal(bodies.length,3);assert.equal(result.answers[0].regions[0].score,'');assert.match(result.answers[0].regions[0].reason,/kanıtı yok/);
 });
 test('valid evidence stays visible; missing, foreign-question, fabricated, unreadable and positive-blank evidence never awards points',()=>{
- const row={region:1,score:5,reason:'Kısmi puan.',unclear:false,evidenceId:'q1-a',studentQuote:'17 akb'};
+ const row={region:1,score:5,reason:'Kısmi puan.',unclear:false,guidanceConflict:false,evidenceId:'q1-a',studentQuote:'17 akb'};
  const score=(r,obs=[observation])=>groundVisualScores({answers:[{question:1,regions:[r]}]},obs).answers[0].regions[0];
  assert.equal(score(row).score,5);assert.match(score(row).reason,/Öğrenci kanıtı.*17 akb/);
  for(const r of [{...row,evidenceId:''},{...row,studentQuote:''},{...row,studentQuote:'3,4 NA akb'},{...row,evidenceId:'q2'}])assert.equal(score(r).score,null);
@@ -42,7 +42,7 @@ test('bad extraction or service failure stops before grading and never substitut
 test('independent disagreement on molecule counts, subscripts, charge or position blocks positive AND zero scores',()=>{
  for(const second of [{...observation,text:'1,7 akb'},{...observation,question:2},{...observation,page:2},{...observation,x:.8,width:.1},{...observation,kind:'unreadable'}]){
   const checked=corroborateStudentEvidence([observation],[second]);assert.equal(checked[0].verified,false);
-  for(const score of [0,10]){const result=groundVisualScores({answers:[{question:1,regions:[{region:1,score,unclear:false,evidenceId:'q1-a',studentQuote:'17 akb',reason:'test'}]}]},checked);assert.equal(result.answers[0].regions[0].score,null);assert.match(result.answers[0].regions[0].reason,/İki bağımsız/);}
+  for(const score of [0,10]){const result=groundVisualScores({answers:[{question:1,regions:[{region:1,score,unclear:false,guidanceConflict:false,evidenceId:'q1-a',studentQuote:'17 akb',reason:'test'}]}]},checked);assert.equal(result.answers[0].regions[0].score,null);assert.match(result.answers[0].regions[0].reason,/İki bağımsız/);}
  }
  for(const [a,b] of [['HCl','H₂Cl'],['OH⁻','OH'],['1 O₂ molekülü','2 O₂ molekülü']])assert.equal(corroborateStudentEvidence([{...observation,text:a}],[{...observation,text:b}])[0].verified,false);
  assert.equal(corroborateStudentEvidence([observation],[{...observation,id:'different-id'}])[0].verified,true);
@@ -54,4 +54,11 @@ test('a disputed criterion leaves the whole question pending while retaining vis
  const result=bulkReadingDraft(draft,{answers:[{question:1,regions:rows,studentAreas:[area]}]});
  assert.equal(result.manualScores[0],'');assert.equal(result.checked[0],false);
  assert.deepEqual(criterionRowsForScore(result,0,''),rows);assert.equal(result.results,undefined);
+});
+
+test('explicit guidance conflict or an omitted conflict check blocks both positive and zero scores',()=>{
+ for(const guidanceConflict of [true,undefined,'false'])for(const score of [0,10]){
+  const data={answers:[{question:1,regions:[{region:1,score,unclear:false,evidenceId:'q1-a',studentQuote:'17 akb',reason:'Örnek fazladan bir koşul içeriyor.',guidanceConflict}]}]};
+  const r=groundVisualScores(data,[{...observation,verified:true}]).answers[0].regions[0];assert.equal(r.score,null);assert.equal(r.unclear,true);assert.match(r.reason,/öğretmen|Öğretmen/);
+ }
 });
