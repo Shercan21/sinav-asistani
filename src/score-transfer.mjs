@@ -1,27 +1,41 @@
+import {gradeExam} from './exam-data.mjs';
 import {PARTICIPATION} from './exam-participation.mjs';
 import {proposalContext} from './local-key-compare.mjs';
 export const tableStructure=exam=>JSON.stringify({className:exam.className,type:exam.type,maxima:exam.key?.map(q=>Number(q.max))||[],questions:exam.questions});
 const round=n=>Math.round((n+Number.EPSILON)*100)/100;
-export async function geminiTableBasis(evaluation){if(!evaluation)return '';const text=JSON.stringify({paper:evaluation.paperFingerprint,key:evaluation.keySignature,reading:evaluation.reading,areas:evaluation.areas});return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(b=>b.toString(16).padStart(2,'0')).join('');}
+export async function geminiTableBasis(evaluation,currentSignature='',savedResults){if(!evaluation&&!savedResults)return '';const text=JSON.stringify({currentSignature,savedResults,paper:evaluation?.paperFingerprint,key:evaluation?.keySignature,reading:evaluation?.reading,areas:evaluation?.areas});return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(b=>b.toString(16).padStart(2,'0')).join('');}
 export function validateScoreTables(value,students){
  if(value===undefined)return;
  if(!value||value.version!==1)throw Error('Puan tabloları geçersiz.');
  for(const mode of ['manual','gemini']){const rows=value[mode];if(rows===undefined)continue;if(!rows||typeof rows!=='object'||Array.isArray(rows)||Object.keys(rows).length>250)throw Error('Puan tablosu satırları geçersiz.');for(const [id,r] of Object.entries(rows))if(!students.some(s=>s.id===id)||!r||!Array.isArray(r.scores)||r.scores.length>200||r.scores.some(v=>v!==null&&(typeof v!=='number'||!Number.isFinite(v)||v<0||v>100))||!PARTICIPATION.includes(r.status)||typeof r.checked!=='boolean'||typeof r.structure!=='string'||r.structure.length>5000||typeof r.basis!=='string'||r.basis.length>64)throw Error('Puan tablosundaki kayıt geçersiz.');}
 }
-export function geminiProposal(exam,id,signature){
- const e=exam.evaluations?.[id];return Array.from({length:exam.questions},(_,i)=>{const r=e?.reading?.[i],a=r?.geminiAreas;if(!e||e.keySignature!==signature||r?.provider!=='gemini'||r.status!=='read'||r.geminiContext!==proposalContext(e,i)||!a?.length||a.some(v=>typeof v.score!=='number'||!Number.isFinite(v.score)||v.score<0||v.score>v.max))return null;const sum=round(a.reduce((n,v)=>n+v.score,0));return sum<=Number(exam.key[i].max)?sum:null;});
+export function geminiProposal(exam,id){
+ const e=exam.evaluations?.[id];return Array.from({length:exam.questions},(_,i)=>{const r=e?.reading?.[i],a=r?.geminiAreas;if(!e||(r?.provider&&r.provider!=='gemini')||!a?.length||a.some(v=>typeof v.score!=='number'||!Number.isFinite(v.score)||v.score<0||v.score>v.max))return null;return round(a.reduce((n,v)=>n+v.score,0));});
 }
-export function scoreTableRows(exam,students,mode,{papers=new Set(),signature='',bases={},fingerprints}={}){
+export function geminiReadingNote(exam,id,signature){
+ const e=exam.evaluations?.[id],reading=e?.reading||[],found=reading.some(r=>r.geminiAreas?.length&&(!r.provider||r.provider==='gemini'));
+ if(!found)return 'Gemini okuması bulunamadı; kayıtlı sonuç puanı buraya kopyalanmadı.';
+ if(reading.some(r=>r.geminiAreas?.length&&!r.provider))return 'Eski yapay zekâ okuması: servis etiketi yok; kontrol gerekli.';
+ if(e.keySignature!==signature||reading.some((r,i)=>r.provider==='gemini'&&r.geminiAreas?.length&&r.geminiContext!==proposalContext(e,i)))return 'Eski Gemini okuması — anahtar, yönerge veya alan değişmiş; kontrol gerekli.';
+ return reading.some(r=>r.provider==='gemini'&&r.geminiAreas?.some(v=>v.score===''))?'Gemini bazı alanları okuyamadı; eksik puanlar bekliyor.':'Gemini okuması mevcut; aktarım için puanları kontrol edin.';
+}
+export function savedTransferScores(exam,id){
+ const values=exam.results?.[id];if(!Array.isArray(values)||gradeExam(exam,values)===null)return null;
+ const choices=exam.type==='Test'&&(!exam.visualRubric||values.every(v=>/^[A-E-]$/.test(v)));
+ return values.map((v,i)=>choices?(v===exam.key[i].answer?Number(exam.key[i].max):0):Number(v));
+}
+export function scoreTableRows(exam,students,mode,{papers=new Set(),signature='',bases={},fingerprints,preferSaved=true,paperReady=true}={}){
  const structure=tableStructure(exam);
  return [...students].sort((a,b)=>String(a.number).localeCompare(String(b.number),'tr',{numeric:true})).map(s=>{
+  const saved=mode==='gemini'&&preferSaved?savedTransferScores(exam,s.id):null;
   const stored=exam.scoreTables?.[mode]?.[s.id],basis=mode==='gemini'?(bases[s.id]||''):'';
-  const sourceInvalid=mode==='gemini'&&fingerprints!==undefined&&(!fingerprints[s.id]||fingerprints[s.id]!==exam.evaluations?.[s.id]?.paperFingerprint);
+  const sourceInvalid=mode==='gemini'&&!saved&&fingerprints!==undefined&&(!fingerprints[s.id]||fingerprints[s.id]!==exam.evaluations?.[s.id]?.paperFingerprint);
   const stale=!!stored&&(sourceInvalid||stored.structure!==structure||(mode==='gemini'&&stored.basis!==basis));
-  const scores=stored&&!stale?[...stored.scores]:mode==='manual'?Array(exam.questions).fill(null):sourceInvalid?Array(exam.questions).fill(null):geminiProposal(exam,s.id,signature);
-  const status=stored?.status||exam.participation?.[s.id]||(mode==='manual'?'Girdi':papers.has(`${exam.id}:${s.id}`)?'Girdi':'Girmedi');
+  const scores=stored&&!stale?[...stored.scores]:mode==='manual'?Array(exam.questions).fill(null):saved||geminiProposal(exam,s.id);
+  const status=stored?.status||exam.participation?.[s.id]||(mode==='manual'||saved||!paperReady?'Girdi':papers.has(`${exam.id}:${s.id}`)?'Girdi':'Girmedi');
   const effective=status==='Muaf'?scores.map(()=>null):['Girmedi','Kopya'].includes(status)?scores.map(()=>0):scores;
-  const complete=effective.length===exam.questions&&(status==='Muaf'||effective.every((n,i)=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=Number(exam.key?.[i]?.max)));
-  return {...s,scores,effective,status,basis,structure,stale,complete,checked:!!stored?.checked&&!stale&&complete,total:status==='Muaf'||!complete?null:round(effective.reduce((a,b)=>a+b,0))};
+  const complete=!(sourceInvalid&&status==='Girdi')&&effective.length===exam.questions&&(status==='Muaf'||effective.every((n,i)=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=Number(exam.key?.[i]?.max)));
+  return {...s,scores,effective,status,basis,structure,stale,complete,readingNote:mode==='gemini'?(saved?'Kaydedilmiş sonuç — Sonucu kaydet ile saklanan soru puanları.':sourceInvalid?'Okuma eski veya farklı kâğıda ait; puanlar gösteriliyor, aktarım için kayıtlı kâğıdı doğrulayın.':geminiReadingNote(exam,s.id,signature)):'',checked:!!stored?.checked&&!stale&&complete,total:status==='Muaf'||!complete?null:round(effective.reduce((a,b)=>a+b,0))};
  });
 }
 export function updateScoreTable(exam,mode,row,patch){
