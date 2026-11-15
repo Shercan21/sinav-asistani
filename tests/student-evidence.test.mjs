@@ -16,7 +16,7 @@ test('extracts student evidence without key, model paper, rubric alternatives or
   const body=JSON.parse(options.body);bodies.push(body);
   if(bodies.length<=2){
    const wire=JSON.stringify(body),images=body.contents[0].parts.filter(p=>p.inlineData).map(p=>p.inlineData.data);
-   assert.deepEqual(images,bodies.length===1?[original.studentImage.base64,original.closeups[0].image.base64]:[original.studentImage.base64]);
+   assert.deepEqual(images,[original.studentImage.base64,original.closeups[0].image.base64]);
    for(const secret of ['SECRET CORRECT ANSWER','SECRET ALTERNATIVE',original.keyImage.base64,original.templateImage.base64,original.closeups[1].image.base64])assert.equal(wire.includes(secret),false);
    return response({observations:[observation]});
   }
