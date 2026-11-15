@@ -10,6 +10,13 @@ export const INSTRUCTION_RULES={
  method:{label:'Tanımlı rubriğe göre işlem basamaklarını değerlendir',text:'İşlem basamağına yalnız öğretmen ayrı puan tanımlamışsa puan ver. Doğru yöntem, ara sonuç ve nihai sonucu ayır; hata taşıma veya kısmi puan kuralı uydurma.'},
  uncertain:{label:'Okunamayanı yanlış sayma; nedenini belirt',text:'Okunamayan veya konumu bulunamayan cevabı otomatik sıfır sayma. Belirsiz puanı boş bırak ve kısa neden yaz; açık yanlış ve açık boş yanıtı ayrı değerlendir.'}
 };
+export const PARTIAL_CREDIT_PRESETS=[
+ {id:'method',mode:'condition',condition:'Sonuç yanlış ama yöntem doğruysa',points:4},
+ {id:'equation',mode:'condition',condition:'Denklem doğru, hesaplama yanlışsa',points:3},
+ {id:'related',mode:'related',condition:'İlgili bir cevap yazılmışsa, yanlış olsa bile',points:2},
+ {id:'empty',mode:'empty',condition:'Boş veya ilgisiz cevapta',points:0}
+];
+export function partialCreditRules(value){return value?.rules|| (value?[{id:'legacy',...value}]:[]);}
 const defaults=['shared','overflow','units','meaning','uncertain'];
 export function emptyInstructions(count){return {version:1,rules:[...defaults],examNote:'',questions:Array.from({length:count},()=>({rules:[],note:''}))}}
 export function validateInstructions(value,count,maxima){
@@ -17,7 +24,7 @@ export function validateInstructions(value,count,maxima){
  const rules=v=>Array.isArray(v)&&v.length<=Object.keys(INSTRUCTION_RULES).length&&new Set(v).size===v.length&&v.every(x=>Object.hasOwn(INSTRUCTION_RULES,x));
  if(!value||value.version!==1||!rules(value.rules)||typeof value.examNote!=='string'||value.examNote.length>4000||!Array.isArray(value.questions)||value.questions.length!==count||value.questions.some(q=>!q||!rules(q.rules)||typeof q.note!=='string'||q.note.length>2000))throw new Error('Okuma yönergelerini kontrol edin. Sınav açıklaması en fazla 4000, soru açıklaması en fazla 2000 karakter olabilir.');
  if(value.explanationsRequired!==undefined&&typeof value.explanationsRequired!=='boolean')throw Error('Cevap açıklaması ayarı geçersiz.');for(const q of value.questions){validateExplanation(q.explanation);if(q.explanationArea!==undefined&&!validArea(q.explanationArea))throw Error('Cevap açıklaması alanı geçersiz.');}
- for(const [i,q] of value.questions.entries()){const r=q.partialCredit;if(r===undefined)continue;if(!r||!['related','condition'].includes(r.mode)||!Number.isFinite(r.points)||r.points<0||r.points>100||typeof r.condition!=='string'||r.condition.length>1000||(r.mode==='condition'&&!r.condition.trim()))throw Error(`${i+1}. sorunun isteğe bağlı kısmi puanını ve koşulunu kontrol edin.`);if(maxima&&r.points>maxima[i])throw Error(`${i+1}. sorunun kısmi puanı soru üst puanını aşamaz.`);}
+ for(const [i,q] of value.questions.entries()){const credit=q.partialCredit;if(credit===undefined)continue;const rows=partialCreditRules(credit);if(!Array.isArray(rows)||!rows.length||rows.length>8||new Set(rows.map(r=>r?.id)).size!==rows.length)throw Error(`${i+1}. sorunun kısmi puan kurallarını seçin.`);for(const r of rows){if(!r||!['related','condition','empty'].includes(r.mode)||!Number.isFinite(r.points)||r.points<0||r.points>100||typeof r.condition!=='string'||r.condition.length>1000||(r.mode==='condition'&&!r.condition.trim())||(r.mode==='empty'&&r.points!==0))throw Error(`${i+1}. sorunun isteğe bağlı kısmi puanını ve koşulunu kontrol edin.`);if(maxima&&r.points>maxima[i])throw Error(`${i+1}. sorunun kısmi puanı soru üst puanını aşamaz.`);}}
  return value;
 }
 export function copyInstructions(value,count){if(!value)return emptyInstructions(count);validateInstructions(value,value.questions.length);return {...structuredClone(value),questions:Array.from({length:count},(_,i)=>value.questions.length===count?structuredClone(value.questions[i]):{rules:[],note:''})}}

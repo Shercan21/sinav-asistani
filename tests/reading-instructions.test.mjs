@@ -1,6 +1,6 @@
 import {withStudentEvidence} from './evidence-fixture.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
-import {emptyInstructions,validateInstructions,copyInstructions,instructionContext} from '../src/reading-instructions.mjs';
+import {emptyInstructions,validateInstructions,copyInstructions,instructionContext,PARTIAL_CREDIT_PRESETS} from '../src/reading-instructions.mjs';
 import {cloneRubricSelections} from '../src/rubric-links.mjs';
 import {visualSignature} from '../src/visual-assessment.mjs';
 import {gradeVisualRubric} from '../gemini-visual-server.mjs';
@@ -44,4 +44,14 @@ test('partial credit reaches scoring only, not blind evidence extraction',async(
  const i=emptyInstructions(1);i.questions[0].partialCredit={mode:'related',points:2.5,condition:''};
  const image={mimeType:'application/pdf',base64:Buffer.from('%PDF-1.4 test').toString('base64')};let calls=0;
  await gradeVisualRubric({comparison:'visual-rubric',consent:true,questions:1,maxima:[100],targets:[1],rubric:[{question:1,answerAreas:[area],regions:[criterion]}],studentImage:image,keyImage:image,instructions:i},{apiKey:'mock',fetcher:withStudentEvidence(async(_url,options)=>{calls++;const body=JSON.parse(options.body),context=JSON.parse(body.contents[0].parts.find(p=>p.text?.startsWith('{')).text);assert.equal(context.teacherGuidance.questions[0].partialCredit.points,2.5);assert.match(body.systemInstruction.parts[0].text,/partialCredit yoksa/);return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({answers:[{question:1,regions:[{region:1,score:2.5,unclear:false,reason:'Mock'}],studentAreas:[]}]})}]}}]})}})});assert.equal(calls,1);
+});
+
+
+test('four optional rules coexist, survive copying, and do not leak to other questions',()=>{
+ const i=emptyInstructions(2);i.questions[0].partialCredit={rules:structuredClone(PARTIAL_CREDIT_PRESETS)};validateInstructions(i,2,[12,10]);
+ const copied=copyInstructions(i,2);assert.deepEqual(copied.questions[0].partialCredit.rules.map(r=>r.points),[4,3,2,0]);assert.equal(instructionContext(copied,2,[2]).questions[0].partialCredit,undefined);
+ copied.questions[0].partialCredit.rules[0].points=1;assert.equal(i.questions[0].partialCredit.rules[0].points,4);
+ assert.throws(()=>validateInstructions(i,2,[3,10]),/üst puan/);
+ const bad=structuredClone(i);bad.questions[0].partialCredit.rules[3].points=1;assert.throws(()=>validateInstructions(bad,2));
+ i.questions[0].partialCredit.rules=i.questions[0].partialCredit.rules.filter(r=>r.id!=='method');validateInstructions(i,2,[3,10]);assert.equal(i.questions[0].partialCredit.rules.length,3);
 });
