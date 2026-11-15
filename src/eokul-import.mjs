@@ -1,6 +1,6 @@
 // This collector runs only when the teacher clicks their bookmark on e-Okul.
 // It reads rendered table/input values. No requests, setters, or form submission.
-export function collectEokulSnapshot(doc,loc,now=new Date()){
+export function collectEokulSnapshot(doc,loc,now=new Date(),includeTargets=false){
  if(loc.protocol!=='https:'||loc.hostname!=='e-okul.meb.gov.tr')throw Error('Bu araç yalnız e-okul.meb.gov.tr not giriş ekranında çalışır.');
  const clean=s=>String(s||'').replace(/\s+/g,' ').trim(),lower=s=>clean(s).toLocaleLowerCase('tr-TR');
  const value=cell=>{if(!cell)return '';const inputs=Array.from(cell.querySelectorAll('input:not([type="hidden"])'));if(inputs.length>1)throw Error('Bir puan hücresinde birden fazla alan var; veri alınmadı.');return clean(inputs.length?inputs[0].value:cell.textContent);};
@@ -15,12 +15,13 @@ export function collectEokulSnapshot(doc,loc,now=new Date()){
    const questions=headers.flatMap((t,index)=>{const m=t.match(/^(\d+)\.\s*(?:soru\s*)?\(\s*(\d+(?:[.,]\d+)?)\s*(?:puan)?\s*\)/);return m?[{index,question:Number(m[1]),max:Number(m[2].replace(',','.'))}]:[];});
    if(school<0||name<0||!questions.length)continue;
    const total=headers.findIndex(t=>/^toplam/.test(t)),participation=headers.findIndex(t=>/^katılım/.test(t));
-   const students=[];
+   const students=[],targets=[];
    for(const row of all.slice(h+1)){const cells=Array.from(row.cells||[]),id=value(cells[school]);if(!/^\d{1,15}$/.test(id))continue;
     const choice=cells[participation]?.querySelector('select'),label=choice?choice.selectedOptions?.[0]?.textContent||choice.value:value(cells[participation]);
+    targets.push({number:id,scoreInputs:questions.map(q=>cells[q.index]?.querySelectorAll('input:not([type="hidden"])')?.[0]||null),participation:choice||null});
     students.push({number:id,name:value(cells[name]),scores:questions.map(q=>number(value(cells[q.index]))),reportedTotal:number(value(cells[total])),status:status(label)});
    }
-   if(students.length)candidates.push({questions,students});break;
+   if(students.length)candidates.push({questions,students,targets});break;
   }
  }
  candidates.sort((a,b)=>b.questions.length-a.questions.length||b.students.length-a.students.length);
@@ -28,7 +29,7 @@ export function collectEokulSnapshot(doc,loc,now=new Date()){
  if(candidates.length>1&&candidates[0].questions.length===candidates[1].questions.length&&candidates[0].students.length===candidates[1].students.length)throw Error('Birden fazla not tablosu var; hangi listenin alınacağı belirsiz.');
  const result=candidates[0];if(result.questions.some((q,i)=>q.question!==i+1))throw Error('Soru sırası doğrulanamadı; veri alınmadı.');
  const count=clean(doc.body?.innerText).match(/(\d+)\s*öğrenci\s*\/\s*(\d+)\s*soru/i);
- return {format:'sinav-asistani-eokul-snapshot',version:1,sourceUrl:loc.origin+loc.pathname,capturedAt:now.toISOString(),questionMaxima:result.questions.map(q=>q.max),...(count?{expectedStudents:Number(count[1])}:{}),students:result.students};
+ return {format:'sinav-asistani-eokul-snapshot',version:1,sourceUrl:loc.origin+loc.pathname,capturedAt:now.toISOString(),questionMaxima:result.questions.map(q=>q.max),...(count?{expectedStudents:Number(count[1])}:{}),students:result.students,fieldMap:result.targets.map(t=>({number:t.number,questions:t.scoreInputs.map(n=>({id:n?.id||'',name:n?.name||'',type:n?.type||'',disabled:!!n?.disabled,readOnly:!!n?.readOnly})),participation:{id:t.participation?.id||'',name:t.participation?.name||''}})),...(includeTargets?{targets:result.targets}:{})};
 }
 export function eokulReadBookmark(){
  const code=`(()=>{try{const data=(${collectEokulSnapshot.toString()})(document,location);const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='e-Okul-notlari.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);alert(data.students.length+' öğrenci okundu. e-Okul alanları değiştirilmedi. Dosyayı Sınav Asistanı içindeki e-Okul’dan not al bölümünde açın.')}catch(e){alert(e.message)}})();`;
