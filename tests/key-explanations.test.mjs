@@ -13,16 +13,16 @@ test('extracts only explicit explanation text from key, distinguishes absent/unr
  }});
  assert.deepEqual(normalizeExplanations(data,3,[1,2,3]),data.explanations);
  const instructions=emptyInstructions(3);instructions.questions.forEach((q,i)=>q.explanation=data.explanations[i].explanation);
- assert.deepEqual(missingExplanations(instructions,[1,2,3]),[2,3]);assert.throws(()=>requireExplanations(instructions,[2]),/öğretmen/);assert.doesNotThrow(()=>requireExplanations(instructions,[1]));
+ assert.deepEqual(missingExplanations(instructions,[1,2,3]),[2,3]);assert.doesNotThrow(()=>requireExplanations(instructions,[2]));assert.doesNotThrow(()=>requireExplanations(instructions,[1]));
  instructions.questions[1].explanation={source:'teacher',text:'Öğretmenin kabul koşulları.'};validateInstructions(instructions,3);requireExplanations(instructions,[1,2]);
  const restored=JSON.parse(JSON.stringify(instructions));assert.equal(instructionContext(restored,3,[1]).questions[0].answerExplanation.text,result.explanations[0].text);
 });
 test('rejects fabricated explanation source, cross-question mapping, overlong text and missing key page',()=>{
  for(const mutate of [r=>r.explanations.pop(),r=>r.explanations[1].question=1,r=>r.explanations[0].source='model',r=>r.explanations[1].text='Invented from example',r=>r.explanations[0].page=0,r=>r.explanations[0].text='x'.repeat(3001)]){const bad=structuredClone(result);mutate(bad);assert.throws(()=>normalizeExplanations(bad,3,[1,2,3]));}
 });
-test('a missing required explanation stops before student extraction or scoring',async()=>{
+test('legacy required flags do not block extraction without an explanation',async()=>{
  const instructions=emptyInstructions(1);instructions.explanationsRequired=true;
- let calls=0;await assert.rejects(gradeVisualRubric({comparison:'visual-rubric',consent:true,questions:1,maxima:[10],targets:[1],instructions,studentImage:pdf,keyImage:pdf,rubric:[{question:1,regions:[{page:1,x:.1,y:.2,width:.5,height:.2,max:10}]}]},{apiKey:'test',fetcher:async()=>{calls++;throw Error('must not call')}}),/cevap açıklaması eksik/);assert.equal(calls,0);
+ let calls=0;await assert.rejects(gradeVisualRubric({comparison:'visual-rubric',consent:true,questions:1,maxima:[10],targets:[1],instructions,studentImage:pdf,keyImage:pdf,rubric:[{question:1,regions:[{page:1,x:.1,y:.2,width:.5,height:.2,max:10}]}]},{apiKey:'test',fetcher:async()=>{calls++;throw Error('extraction reached')}}),/extraction reached/);assert.equal(calls,1);
 });
 test('teacher-selected crop needs no heading, retains original page and teacher edits replace extracted text in grading context',async()=>{
  const selectedRegion={page:3,x:.1,y:.2,width:.6,height:.2};

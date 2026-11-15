@@ -62,3 +62,5 @@ test('explicit guidance conflict or an omitted conflict check blocks both positi
   const r=groundVisualScores(data,[{...observation,verified:true}]).answers[0].regions[0];assert.equal(r.score,null);assert.equal(r.unclear,true);assert.match(r.reason,/öğretmen|Öğretmen/);
  }
 });
+
+test('small evidence boxes pass without accepting zero or out-of-page geometry',()=>{assert.equal(validateStudentEvidence({observations:[{...observation,width:.002,height:.003}]},[1]).length,1);for(const change of [{width:0},{height:0},{x:.99,width:.02},{page:0}])assert.throws(()=>validateStudentEvidence({observations:[{...observation,...change}]},[1]));});
