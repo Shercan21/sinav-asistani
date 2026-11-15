@@ -29,3 +29,19 @@ test('selected guidance and alternatives reach the grading request together',asy
  const image={mimeType:'application/pdf',base64:Buffer.from('%PDF-1.4 test').toString('base64')},input={comparison:'visual-rubric',consent:true,questions:1,maxima:[100],targets:[1],rubric:[{question:1,answerAreas:[area],regions:[criterion]}],studentImage:image,keyImage:image,instructions};let calls=0;
  const result=await gradeVisualRubric(input,{apiKey:'mock',fetcher:withStudentEvidence(async(_url,options)=>{calls++;const body=JSON.parse(options.body),context=JSON.parse(body.contents[0].parts.find(p=>p.text?.startsWith('{')).text);assert.equal(context.assessmentPolicy.pointWeights,'rubric.criteria.max only');assert.match(context.assessmentPolicy.referenceImages,/never add acceptance conditions/);assert.ok(body.generationConfig.responseSchema.properties.answers.items.properties.regions.items.required.includes('guidanceConflict'));assert.equal(context.teacherGuidance.examNote,instructions.examNote);assert.equal(context.teacherGuidance.questions[0].note,instructions.questions[0].note);assert.deepEqual(context.rubric[0].criteria[0].acceptableAlternatives,criterion.alternatives);return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({answers:[{question:1,regions:[{region:1,score:70,unclear:false,reason:'Mock'}],studentAreas:[]}]})}]}}]})}})});assert.equal(calls,1);assert.equal(result.answers[0].regions[0].score,70);
 });
+
+
+test('optional partial credit is isolated by question, persisted and bounded by question maximum',async()=>{
+ const i=emptyInstructions(2);assert.equal(instructionContext(i,2,[1]).questions[0].partialCredit,undefined);
+ i.questions[1].partialCredit={mode:'condition',points:2.5,condition:'Doğru yöntemi kurmuşsa'};
+ validateInstructions(i,2,[10,5]);const restored=JSON.parse(JSON.stringify(i));assert.deepEqual(instructionContext(restored,2,[2]).questions[0].partialCredit,i.questions[1].partialCredit);assert.equal(JSON.stringify(instructionContext(i,2,[1])).includes('Doğru yöntemi'),false);
+ assert.throws(()=>validateInstructions(i,2,[10,2]),/üst puan/);
+ for(const rule of [{mode:'bad',points:2,condition:''},{mode:'condition',points:2,condition:''},{mode:'related',points:-1,condition:''},{mode:'related',points:'2',condition:''}]){const bad=structuredClone(i);bad.questions[1].partialCredit=rule;assert.throws(()=>validateInstructions(bad,2));}
+ const a=structuredClone(key);a.instructions.questions[0].partialCredit={mode:'related',points:2,condition:''};assert.notEqual(await visualSignature([{max:100}],key),await visualSignature([{max:100}],a));
+});
+
+test('partial credit reaches scoring only, not blind evidence extraction',async()=>{
+ const i=emptyInstructions(1);i.questions[0].partialCredit={mode:'related',points:2.5,condition:''};
+ const image={mimeType:'application/pdf',base64:Buffer.from('%PDF-1.4 test').toString('base64')};let calls=0;
+ await gradeVisualRubric({comparison:'visual-rubric',consent:true,questions:1,maxima:[100],targets:[1],rubric:[{question:1,answerAreas:[area],regions:[criterion]}],studentImage:image,keyImage:image,instructions:i},{apiKey:'mock',fetcher:withStudentEvidence(async(_url,options)=>{calls++;const body=JSON.parse(options.body),context=JSON.parse(body.contents[0].parts.find(p=>p.text?.startsWith('{')).text);assert.equal(context.teacherGuidance.questions[0].partialCredit.points,2.5);assert.match(body.systemInstruction.parts[0].text,/partialCredit yoksa/);return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({answers:[{question:1,regions:[{region:1,score:2.5,unclear:false,reason:'Mock'}],studentAreas:[]}]})}]}}]})}})});assert.equal(calls,1);
+});
