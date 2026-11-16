@@ -1,3 +1,4 @@
+import UsageGuide from './UsageGuide.jsx';
 import ScoreTransfer from './ScoreTransfer.jsx';
 import OpticalReader from './OpticalReader.jsx';
 import SerialScoreScan from './SerialScoreScan.jsx';
@@ -15,7 +16,7 @@ import InstallApp from './InstallApp.jsx';
 import DeleteRecords from './DeleteRecords.jsx';
 import Analysis from './Analysis.jsx';
 
-const sections = [ ['Genel Bakış',LayoutDashboard], ['Sınıflarım',Users], ['Sınavlar',ClipboardList], ['Seri puan tarama',FileText], ['Test / optik okuma',CheckCircle2], ['Notları e-Okul’a aktar',FileText], ['Raporlar',FileBarChart2], ['Ayarlar',Settings] ];
+const sections = [ ['Genel Bakış',LayoutDashboard], ['Sınıflarım',Users], ['Sınavlar',ClipboardList], ['Seri puan tarama',FileText], ['Test / optik okuma',CheckCircle2], ['Notları e-Okul’a aktar',FileText], ['Raporlar',FileBarChart2], ['Ayarlar',Settings], ['Kullanım kılavuzu',BookOpen] ];
 const getSaved=(key,fallback)=>{try{const x=localStorage.getItem(key);return x?JSON.parse(x):fallback}catch{return fallback}};
 function App(){
  const [page,setPage]=useState('Genel Bakış');
@@ -47,6 +48,7 @@ function App(){
  {page==='Sınavlar'&&<><PageHead eyebrow="SINAV YÖNETİMİ" title="Sınavlar" desc="Sınav taslaklarınızı oluşturun ve takip edin." button="Yeni sınav" onClick={()=>openExam()}/><div className="notice">Önce cevap anahtarını hazırlayın. Test cevapları otomatik hesaplanır; klasik ve karma sınavlarda soru puanlarını siz girersiniz.</div><section className="panel"><h3>Sınav listesi</h3>{exams.map(e=><div className="list-row" key={e.id}><span className="item-icon"><BookOpen size={19}/></span><div><strong>{e.name}</strong><small>{e.className} · {e.subject} · {e.questions} soru · {e.type}</small></div><div className="exam-actions"><button type="button" className="tag" aria-label={`${e.name} taslağını düzenle`} onClick={()=>openExam(e)}>Taslak</button><button className="secondary" aria-label={`${e.name} değerlendir`} onClick={()=>setWorkspaceId(e.id)}>Değerlendir</button></div></div>)}{!exams.length&&<p className="empty">Henüz sınav yok.</p>}</section></>}
  {page==='Seri puan tarama'&&<SerialScoreScan classes={classes}/>} {page==='Test / optik okuma'&&<OpticalReader classes={classes}/>}
  {page==='Notları e-Okul’a aktar'&&<ScoreTransfer classes={classes} exams={exams} setExams={setExams}/>}
+ {page==='Kullanım kılavuzu'&&<UsageGuide/>}
  {page==='Raporlar'&&<><PageHead eyebrow="ANALİZ VE DEĞERLENDİRME" title="Raporlar" desc="Sınav, konu/kazanım, şube ve öğrenci gelişimi analizleri."/><Analysis exams={exams} classes={classes} setExams={setExams} inform={inform}/></>}
  {page==='Ayarlar'&&<><PageHead eyebrow="HESAP" title="Ayarlar" desc="Üyelik ve uygulama ayarları."/><div className="two-cols"><section className="panel"><h3>Hesap durumu</h3><div className="setting"><span>Plan</span><strong>Ücretsiz (demo)</strong></div><div className="setting"><span>Öğrenci hakkı</span><strong>{total} / 250 toplam</strong></div><div className="setting"><span>E-posta ile giriş</span><strong>Bağlı</strong></div><div className="setting"><span>Bulut eşitleme</span><strong>Bağlı</strong></div></section><section className="panel"><h3>Premium üyelik</h3><p>Aylık ve yıllık Premium üyelik sistemi ileride eklenecek. Bu sürümde ödeme alınmaz.</p><button className="secondary" onClick={()=>inform('Premium üyelik henüz etkin değil.')}>Premium bilgisi</button></section></div><LegacyImport setClasses={setClasses} setExams={setExams}/><BackupPanel classes={classes} exams={exams} setClasses={setClasses} setExams={setExams}/><div className="notice">Kayıtlar hesabınıza özel bulut alanına eşitlenir. Üstteki kayıt durumunu kontrol edin. İnternet kesilirse değişiklikler cihazda bekler; ayrıca düzenli yedek alın.</div></>}
  </main><footer>© 2026 Sınav Asistanı · Başlangıç sürümü 0.1 · Kişisel hesap ve bulut eşitleme</footer></div>
