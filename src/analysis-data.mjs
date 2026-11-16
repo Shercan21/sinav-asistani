@@ -1,6 +1,16 @@
 // Analiz ve değerlendirme: yazılı sınavlar, seri puan taraması ve optik okumaları
 // tek bir "kaynak" biçimine çevirir; özet, soru, konu ve öğrenci gelişimi hesaplar.
 import {gradeExam} from './exam-data.mjs';
+import {scoreTableRows} from './score-transfer.mjs';
+
+export function scoreSheetSource(exam,classroom,sheet){
+ const meta=sheet.analysis||exam.analysis||{};
+ const questions=exam.key.map((q,i)=>({no:i+1,max:Number(q.max),answer:null,topic:meta.topics?.[i]||''}));
+ const all=scoreTableRows({...exam,scoreTables:{manual:sheet.rows}},classroom.students||[],'manual');
+ const included=all.filter(r=>r.status==='Girdi'&&r.complete&&!r.stale);
+ return {id:`sheet:${exam.id}:${sheet.id}`,ref:exam.id,kind:'scoreSheet',label:'Puan listesi',name:`${exam.name} · ${sheet.name}`,subject:exam.subject||'',classId:classroom.id,className:classroom.name,date:meta.date||exam.date||'',choices:0,type:exam.type,questions,meta,keyReady:true,
+ rows:included.map(r=>({studentId:r.id,number:r.number,name:r.name,total:r.total,perQ:r.effective.map((got,i)=>({got,max:questions[i].max,choice:null,correct:null}))})),excluded:all.length-included.length};
+}
 
 const num = v => v === '' || v === null || v === undefined ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
 const r2 = v => v === null ? null : Math.round(v * 100) / 100;

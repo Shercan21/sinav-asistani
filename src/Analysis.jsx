@@ -77,7 +77,7 @@ function MetaEditor({source, onSave}) {
   </details>;
 }
 
-function ExamAnalysis({source, sources, onSaveMeta}) {
+export function ExamAnalysis({source, sources, onSaveMeta}) {
   const s = summary(source), qs = questionStats(source), topics = topicStats([source]), matrix = studentTopics(source), compare = sectionCompare(source, sources);
   const weak = topics.filter(t => t.pct !== null && t.pct < 40);
   const letters = source.choices ? 'ABCDE'.slice(0, source.choices).split('') : [];
