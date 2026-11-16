@@ -1,3 +1,4 @@
+import {readingDeadline} from './reading-deadline.mjs';
 import {ensureReadingAccess,clearReadingKeys,forgetReadingKey} from './reading-access.mjs';
 import {getReadingProvider} from './reading-providers.mjs';
 import {readTeacherRecord} from './cloud-record-read.mjs';
@@ -22,29 +23,32 @@ export async function accountConnection(userId) {
   if(!scopedConnection||scopedUser!==userId){scopedUser=userId;scopedConnection=createClient(url,key,{accessToken:()=>sessionAccess.token(userId)})}
   return scopedConnection;
 }
+async function readingSession(){const {data,error}=await readingDeadline(()=>cloud.auth.getSession(),{milliseconds:15000,message:'Giriş oturumu doğrulanamadı. Sayfayı yenileyip yeniden deneyin; sürerse tekrar giriş yapın.'});if(error)throw error;return data.session;}
 let geminiAccount='';
 export async function prepareGeminiAccess(){
- const {data:{session}}=await cloud.auth.getSession();const id=session?.user.id||'local';
+ const session=await readingSession();const id=session?.user.id||'local';
  if(id!==geminiAccount){clearGeminiKeys();clearReadingKeys();geminiAccount=id}
  const headers=session?{Authorization:`Bearer ${session.access_token}`} : {};
- const key=await ensureGeminiAccess(id,url=>fetch(url,{headers}));
- const {data:{session:current}}=await cloud.auth.getSession();
+ const key=await ensureGeminiAccess(id,url=>readingDeadline(()=>fetch(url,{headers,signal:AbortSignal.timeout(15000)}),{milliseconds:14000,message:'Okuma sunucusuna bağlantı kontrolü zamanında tamamlanamadı. Biraz sonra yeniden deneyin.'}));
+ const current=await readingSession();
  if((current?.user.id||'local')!==id){clearGeminiKeys();clearReadingKeys();throw new Error('Hesap değişti. Okumayı yeniden başlatın.')}
  return {key,id};
 }
 cloud.auth.onAuthStateChange((event,session)=>{rememberCloudSession(session);if(event==='SIGNED_OUT'){clearGeminiKeys();clearReadingKeys();geminiAccount=''}});
 export async function prepareReadingAccess(provider=getReadingProvider()){
  if(provider==='gemini')return prepareGeminiAccess();
- const {data:{session}}=await cloud.auth.getSession(),id=session?.user.id||'local';
+ const session=await readingSession(),id=session?.user.id||'local';
  if(id!==geminiAccount){clearGeminiKeys();clearReadingKeys();geminiAccount=id}
  const key=await ensureReadingAccess(id,provider);
- const {data:{session:current}}=await cloud.auth.getSession();
+ const current=await readingSession();
  if((current?.user.id||'local')!==id){clearReadingKeys();throw new Error('Hesap değişti. Okumayı yeniden başlatın.')}
  return {key,id};
 }
 export async function cloudFetch(url,options={}) {
  const {readingProvider='gemini',...requestOptions}=options;let access;if(options.method==='POST'&&['/api/ocr','/api/ocr/grade'].includes(url))access=await prepareReadingAccess(readingProvider);
- const {data:{session}} = await cloud.auth.getSession();
+ requestOptions.signal?.throwIfAborted();
+ const session=await readingSession();
+ requestOptions.signal?.throwIfAborted();
  const response=await fetch(url,{...requestOptions,headers:{...options.headers,...(session?{Authorization:`Bearer ${session.access_token}`} : {}),...(url==='/api/ocr/grade'?{'X-Reading-Provider':readingProvider}:{}),...(access?.key?{[readingProvider==='gemini'?'X-Gemini-Api-Key':'X-Reading-Api-Key']:access.key}:{})}});
  if(access?.key&&[400,401,403].includes(response.status)){const result=await response.clone().json().catch(()=>null);if(/anahtar|erişim/.test(result?.error||'')){if(readingProvider==='gemini')forgetGeminiKey(access.id);else forgetReadingKey(access.id,readingProvider)}}
  return response;
