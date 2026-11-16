@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {geminiRequest} from '../gemini-request.mjs';
+const failure=(status,code,message='private text')=>({ok:false,status,json:async()=>({error:{status:code,message}})});
+test('temporary Gemini unavailability is retried once; success remains intact',async()=>{let calls=0,waits=0;const good={ok:true};const result=await geminiRequest('https://example.test',{}, {fetcher:async()=>++calls===1?failure(503,'UNAVAILABLE'):good,wait:async()=>{waits++;}});assert.equal(result,good);assert.equal(calls,2);assert.equal(waits,1);});
+test('quota is not retried and includes safe HTTP diagnostics',async()=>{let calls=0;await assert.rejects(geminiRequest('https://example.test',{}, {fetcher:async()=>{calls++;return failure(429,'RESOURCE_EXHAUSTED');}}),/HTTP 429; RESOURCE_EXHAUSTED/);assert.equal(calls,1);});
+test('invalid requests retain HTTP status without exposing provider messages or keys',async()=>{await assert.rejects(geminiRequest('https://example.test',{}, {fetcher:async()=>failure(400,'INVALID_ARGUMENT','secret AIza_test student-data')}),e=>/HTTP 400; INVALID_ARGUMENT/.test(e.message)&&!e.message.includes('secret')&&!e.message.includes('student-data'));});
+test('repeated temporary failure stops after one retry; aborted operation never sends',async()=>{let calls=0;await assert.rejects(geminiRequest('https://example.test',{}, {fetcher:async()=>{calls++;return failure(503,'UNAVAILABLE');},wait:async()=>{}}),/HTTP 503/);assert.equal(calls,2);const control=new AbortController();control.abort();await assert.rejects(geminiRequest('https://example.test',{signal:control.signal},{fetcher:()=>{throw Error('Should not send');}}),{name:'AbortError'});});

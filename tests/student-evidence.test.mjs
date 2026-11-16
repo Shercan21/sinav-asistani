@@ -35,7 +35,7 @@ test('valid evidence stays visible; missing, foreign-question, fabricated, unrea
 });
 test('bad extraction or service failure stops before grading and never substitutes an answer key',async()=>{
  for(const bad of [{observations:[{...observation,x:2}]},{observations:[observation,observation]},{observations:[{...observation,question:2}]}])assert.throws(()=>validateStudentEvidence(bad,[1]));
- let calls=0;await assert.rejects(gradeVisualRubric(input(),{apiKey:'test',fetcher:async()=>{calls++;return {ok:false,status:503};}}),/çıkarılamadı/);assert.equal(calls,1);
+ let calls=0;await assert.rejects(gradeVisualRubric(input(),{apiKey:'test',fetcher:async()=>{calls++;return {ok:false,status:503};}}),/çıkarılamadı/);assert.equal(calls,2);
  calls=0;await assert.rejects(gradeVisualRubric(input(),{apiKey:'test',fetcher:async()=>{calls++;return response({observations:[{...observation,page:0}]});}}),/doğrulanamadı/);assert.equal(calls,1);
 });
 
