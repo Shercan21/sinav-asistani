@@ -10,11 +10,19 @@ const pdf=s=>({mimeType:'application/pdf',base64:Buffer.from('%PDF-1.4 '+s).toSt
 const observation={id:'q1-a',question:1,kind:'writing',text:'17 akb',...area};
 const response=data=>({ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(data)}]}}]})});
 const input=()=>({comparison:'visual-rubric',consent:true,questions:1,maxima:[10],targets:[1],studentImage:pdf('STUDENT'),keyImage:pdf('KEY'),templateImage:pdf('OTHER-STUDENT'),instructions:{version:1,rules:[],examNote:'SECRET CORRECT ANSWER',questions:[{rules:[],note:''}]},rubric:[{question:1,regions:[{...area,max:10,alternatives:['SECRET ALTERNATIVE']}]}],closeups:[{question:1,role:'student',image:pdf('STUDENT-CROP')},{question:1,role:'key',image:pdf('KEY-CROP')}]});
+test('normal reading scores clear evidence without a duplicate transcription or any previous grade',async()=>{
+ const original={...input(),previousScore:'OLD_GRADE_DO_NOT_SEND',results:{student:[9]}};let calls=0;
+ const result=await gradeVisualRubric(original,{apiKey:'test',fetcher:async(_url,options)=>{
+  calls++;const wire=options.body;assert.equal(wire.includes('OLD_GRADE_DO_NOT_SEND'),false);assert.equal(wire.includes('"results"'),false);
+  if(calls===1)return response({observations:[observation]});
+  assert.equal(calls,2);return response({answers:[{question:1,regions:[{region:1,score:7,reason:'Ölçüte göre kısmi puan.',unclear:false,guidanceConflict:false,evidenceId:'q1-a',studentQuote:'17 akb'}],studentAreas:[area]}]});
+ }});assert.equal(calls,2);assert.equal(result.answers[0].regions[0].score,7);assert.deepEqual(original.results,{student:[9]});
+});
 test('extracts student evidence without key, model paper, rubric alternatives or answer-bearing instructions; grading cannot invent a quote',async()=>{
  const original=input(),bodies=[];
  const result=await gradeVisualRubric(original,{apiKey:'test',fetcher:async(_url,options)=>{
   const body=JSON.parse(options.body);bodies.push(body);
-  if(bodies.length<=2){
+  if(bodies.length===1){
    const wire=JSON.stringify(body),images=body.contents[0].parts.filter(p=>p.inlineData).map(p=>p.inlineData.data);
    assert.deepEqual(images,[original.studentImage.base64,original.closeups[0].image.base64]);
    for(const secret of ['SECRET CORRECT ANSWER','SECRET ALTERNATIVE',original.keyImage.base64,original.templateImage.base64,original.closeups[1].image.base64])assert.equal(wire.includes(secret),false);
@@ -23,7 +31,7 @@ test('extracts student evidence without key, model paper, rubric alternatives or
   assert.match(JSON.stringify(body),/studentEvidence/);
   return response({answers:[{question:1,regions:[{region:1,score:10,reason:'3,4 N_A akb doğru.',unclear:false,guidanceConflict:false,evidenceId:'q1-a',studentQuote:'3,4 N_A akb'}],studentAreas:[area]}]});
  }});
- assert.equal(bodies.length,3);assert.equal(result.answers[0].regions[0].score,'');assert.match(result.answers[0].regions[0].reason,/kanıtı yok/);
+ assert.equal(bodies.length,2);assert.equal(result.answers[0].regions[0].score,'');assert.match(result.answers[0].regions[0].reason,/kanıtı yok/);
 });
 test('valid evidence stays visible; missing, foreign-question, fabricated, unreadable and positive-blank evidence never awards points',()=>{
  const row={region:1,score:5,reason:'Kısmi puan.',unclear:false,guidanceConflict:false,evidenceId:'q1-a',studentQuote:'17 akb'};
