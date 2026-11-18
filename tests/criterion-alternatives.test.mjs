@@ -19,3 +19,6 @@ test('alternatives survive key cloning and backup, remain scoped to the criterio
 test('student comparison joins selected fragments of one answer into a full crop without mixing pages or linked areas',()=>{
  const a=area('a',{answerAreaId:'answer',height:.04}),b=area('b',{answerAreaId:'answer',y:.3,height:.04}),other=area('c',{answerAreaId:'other',x:.7,width:.2}),next=area('d',{page:2});const source=[a,b,other,next],copy=structuredClone(source),view=studentComparisonAreas(source);assert.equal(view.length,3);assert.equal(view[0].y,.2);assert.ok(Math.abs(view[0].height-.14)<1e-8);assert.deepEqual(source,copy);assert.equal(view[1],other);assert.equal(view[2],next);
 });
+test('a containing selected answer rectangle is shown whole instead of separate word crops',()=>{
+ const fragments=[area('a',{answerAreaId:'answer',x:.2,width:.1,height:.02}),area('b',{answerAreaId:'answer',x:.3,y:.25,width:.2,height:.02})];const before=structuredClone(fragments),template=area('answer',{x:.05,y:.1,width:.9,height:.3});const view=studentComparisonAreas(fragments,[template]);assert.equal(view.length,1);for(const k of ['x','y','width','height'])assert.equal(view[0][k],template[k]);assert.deepEqual(fragments,before);assert.ok(studentComparisonAreas(fragments,[{...template,page:2}])[0].width<template.width);
+});
